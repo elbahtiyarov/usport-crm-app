@@ -1,0 +1,19 @@
+{
+  "name": "usport-crm",
+  "version": "1.0.0",
+  "private": true,
+  "description": "USPORT CRM — Express + PostgreSQL, каталог/клиенты/заказы/документы",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js",
+    "migrate": "node db/migrate.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "multer": "^2.4.0",
+    "pg": "^8.12.0"
+  }
+}

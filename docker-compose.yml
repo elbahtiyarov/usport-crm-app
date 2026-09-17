@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: usport
+      POSTGRES_PASSWORD: usport
+      POSTGRES_DB: usport_crm
+    ports:
+      - "5432:5432"
+    volumes:
+      - usport_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U usport -d usport_crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://usport:usport@db:5432/usport_crm
+    ports:
+      - "3000:3000"
+    volumes:
+      - usport_uploads:/app/server/uploads
+
+volumes:
+  usport_db_data:
+  usport_uploads:

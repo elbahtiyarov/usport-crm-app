@@ -1,0 +1,87 @@
+-- USPORT CRM — схема PostgreSQL
+-- Применить: psql -U usport -d usport_crm -f schema.sql
+
+CREATE TABLE IF NOT EXISTS clients (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  phone TEXT,
+  source TEXT,
+  requisites TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS products (
+  id SERIAL PRIMARY KEY,
+  sku TEXT,
+  name TEXT NOT NULL,
+  category TEXT,
+  price NUMERIC(12,2) NOT NULL DEFAULT 0,
+  specs TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+  id SERIAL PRIMARY KEY,
+  client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+  client_name TEXT,
+  stage TEXT NOT NULL DEFAULT 'request',
+  amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+  id SERIAL PRIMARY KEY,
+  order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+  sku TEXT,
+  name TEXT NOT NULL,
+  qty NUMERIC(12,2) NOT NULL DEFAULT 1,
+  price NUMERIC(12,2) NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS documents (
+  id SERIAL PRIMARY KEY,
+  doc_type TEXT NOT NULL, -- kp | invoice | waybill | contract
+  client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+  client_name TEXT,
+  order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+  amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'draft', -- draft | sent | confirmed | declined
+  notes TEXT,
+  valid_until DATE,
+  due_date DATE,
+  ship_date DATE,
+  sign_date DATE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS document_items (
+  id SERIAL PRIMARY KEY,
+  document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  sku TEXT,
+  name TEXT NOT NULL,
+  qty NUMERIC(12,2) NOT NULL DEFAULT 1,
+  price NUMERIC(12,2) NOT NULL DEFAULT 0
+);
+
+-- Единственная строка с реквизитами компании
+CREATE TABLE IF NOT EXISTS settings (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  name TEXT NOT NULL DEFAULT 'USPORT',
+  legal_address TEXT,
+  phone TEXT,
+  email TEXT,
+  director_name TEXT,
+  requisites TEXT,
+  logo_url TEXT,
+  CONSTRAINT settings_single_row CHECK (id = 1)
+);
+
+INSERT INTO settings (id, name) VALUES (1, 'USPORT')
+ON CONFLICT (id) DO NOTHING;
+
+CREATE INDEX IF NOT EXISTS idx_orders_stage ON orders(stage);
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(doc_type);
+CREATE INDEX IF NOT EXISTS idx_document_items_doc ON document_items(document_id);
