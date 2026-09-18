@@ -137,6 +137,8 @@
   .badge.type-invoice { background: var(--green-pale); color: var(--green); }
   .badge.type-waybill { background: var(--amber-pale); color: var(--amber); }
   .badge.type-contract { background: var(--purple-pale); color: var(--purple); }
+  .badge.role-admin { background: var(--purple-pale); color: var(--purple); }
+  .badge.role-manager { background: var(--navy-pale); color: var(--navy-dim); }
   .badge.status-draft { background: var(--chip); color: var(--ink-soft); }
   .badge.status-sent { background: var(--navy-pale); color: var(--navy-dim); }
   .badge.status-confirmed { background: var(--green-pale); color: var(--green); }
@@ -372,6 +374,10 @@
     Документы <span class="nav-count" id="navCountDocuments">0</span>
   </button>
   <div class="nav-spacer"></div>
+  <button class="nav-item" data-tab="users" id="usersNavItem" style="display:none;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Пользователи <span class="nav-count" id="navCountUsers">0</span>
+  </button>
   <button class="nav-item" data-tab="settings">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 0 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 0 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1-1.55V3a2 2 0 0 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 0 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg>
     Настройки
@@ -419,6 +425,7 @@
     <div id="tab-clients" style="display:none"></div>
     <div id="tab-orders" style="display:none"></div>
     <div id="tab-documents" style="display:none"></div>
+    <div id="tab-users" style="display:none"></div>
     <div id="tab-settings" style="display:none"></div>
   </div>
 </main>
@@ -467,7 +474,7 @@
   }
 
   let activeTab = 'products';
-  let products = [], clients = [], orders = [], documents = [], settings = { name: 'USPORT' };
+  let products = [], clients = [], orders = [], documents = [], users = [], settings = { name: 'USPORT' };
   let productSearch = '', clientSearch = '';
   let modalItems = [];
   let currentUser = null;
@@ -490,6 +497,7 @@
   function showApp(){
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('appShell').style.display = 'flex';
+    document.getElementById('usersNavItem').style.display = (currentUser && currentUser.role === 'admin') ? '' : 'none';
     renderUserFooter();
   }
   function showLogin(){
@@ -553,9 +561,11 @@
 
   async function loadAll(){
     try {
-      [products, clients, orders, documents, settings] = await Promise.all([
-        api('GET', '/products'), api('GET', '/clients'), api('GET', '/orders'), api('GET', '/documents'), api('GET', '/settings')
-      ]);
+      const calls = [api('GET', '/products'), api('GET', '/clients'), api('GET', '/orders'), api('GET', '/documents'), api('GET', '/settings')];
+      if (currentUser && currentUser.role === 'admin') calls.push(api('GET', '/users'));
+      const results = await Promise.all(calls);
+      [products, clients, orders, documents, settings] = results;
+      if (currentUser && currentUser.role === 'admin') users = results[5];
       setConnected(true);
       renderSidebarLogo(); renderNavCounts(); renderStats(); renderActiveTab();
     } catch (e) {
@@ -595,6 +605,7 @@
     document.getElementById('navCountClients').textContent = clients.length;
     document.getElementById('navCountOrders').textContent = orders.length;
     document.getElementById('navCountDocuments').textContent = documents.length;
+    document.getElementById('navCountUsers').textContent = users.length;
   }
   function renderStats(){
     document.getElementById('statProducts').textContent = products.length;
@@ -610,6 +621,7 @@
     clients: { title: 'Клиенты', sub: 'База клиентов и история обращений', addLabel: 'Новый клиент' },
     orders: { title: 'Заказы', sub: 'Заявка → расчёт → КП → согласование → оплата → производство → отгрузка', addLabel: 'Новый заказ' },
     documents: { title: 'Документы', sub: 'КП, счета, накладные и договоры — печать в PDF', addLabel: 'Новый документ' },
+    users: { title: 'Пользователи', sub: 'Кто может входить в систему и с какой ролью', addLabel: 'Новый пользователь' },
     settings: { title: 'Настройки', sub: 'Реквизиты компании и логотип для документов', addLabel: '' }
   };
 
@@ -622,11 +634,11 @@
       document.getElementById('pageTitle').textContent = meta.title;
       document.getElementById('pageSub').textContent = meta.sub;
       document.getElementById('addBtnLabel').textContent = meta.addLabel;
-      document.getElementById('addBtn').style.display = activeTab === 'settings' ? 'none' : '';
+      document.getElementById('addBtn').style.display = (activeTab === 'settings') ? 'none' : '';
       document.getElementById('importBtn').style.display = (activeTab === 'products' || activeTab === 'documents') ? '' : 'none';
       document.getElementById('importBtnLabel').textContent = activeTab === 'documents' ? 'Импорт КП из Excel' : 'Импорт прайса из Excel';
-      document.getElementById('statsRow').style.display = activeTab === 'settings' ? 'none' : '';
-      ['products','clients','orders','documents','settings'].forEach(t => document.getElementById('tab-'+t).style.display = t === activeTab ? '' : 'none');
+      document.getElementById('statsRow').style.display = (activeTab === 'settings' || activeTab === 'users') ? 'none' : '';
+      ['products','clients','orders','documents','users','settings'].forEach(t => document.getElementById('tab-'+t).style.display = t === activeTab ? '' : 'none');
       renderActiveTab();
     });
   });
@@ -636,6 +648,7 @@
     if (activeTab === 'clients') renderClients();
     if (activeTab === 'orders') renderOrders();
     if (activeTab === 'documents') renderDocuments();
+    if (activeTab === 'users') renderUsers();
     if (activeTab === 'settings') renderSettings();
   }
 
@@ -644,6 +657,7 @@
     if (activeTab === 'clients') openClientModal();
     if (activeTab === 'orders') openOrderModal();
     if (activeTab === 'documents') openDocumentModal();
+    if (activeTab === 'users') openUserModal();
   });
 
   document.getElementById('importBtn').addEventListener('click', () => {
@@ -667,7 +681,7 @@
       const data = await res.json();
       if (!res.ok) { alert(data.error || 'Не удалось загрузить файл'); return; }
       if (activeTab === 'documents') {
-        alert(`Готово: создано документов (КП) — ${data.created}`);
+        alert(`Готово: создано документов (КП) — ${data.created}\nВ каталог товаров: новых — ${data.productsInserted}, обновлено — ${data.productsUpdated}`);
       } else {
         alert(`Готово: новых товаров — ${data.inserted}, обновлено — ${data.updated} (всего в файле: ${data.total})`);
       }
@@ -702,7 +716,7 @@
 
     wrap.innerHTML = list.length === 0 ? `<div class="empty-state">${q ? 'Ничего не найдено.' : 'Товаров пока нет. Добавьте первый через кнопку выше.'}</div>` : `
         <table>
-          <thead><tr><th></th><th>Артикул</th><th>Наименование</th><th>Категория</th><th>Цена</th><th>Характеристики</th><th></th></tr></thead>
+          <thead><tr><th></th><th>Артикул</th><th>Наименование</th><th>Категория</th><th>Цена</th><th>Характеристики</th><th>Автор</th><th></th></tr></thead>
           <tbody>
             ${list.map(p => `
               <tr>
@@ -712,9 +726,12 @@
                 <td>${escapeHtml(p.category||'—')}</td>
                 <td>${fmt(p.price)}</td>
                 <td style="max-width:240px;color:var(--ink-soft);font-size:13px;">${escapeHtml(p.specs||'—')}</td>
+                <td style="color:var(--ink-soft);font-size:12.5px;">${escapeHtml(p.createdByEmail||'—')}</td>
                 <td><div class="row-actions">
-                  <button class="btn-ghost-sm" data-edit="${p.id}">Изменить</button>
-                  <button class="btn-danger-sm" data-del="${p.id}">Удалить</button>
+                  ${canEdit(p) ? `
+                    <button class="btn-ghost-sm" data-edit="${p.id}">Изменить</button>
+                    <button class="btn-danger-sm" data-del="${p.id}">Удалить</button>
+                  ` : `<span style="font-size:11.5px;color:var(--ink-soft);">только просмотр</span>`}
                 </div></td>
               </tr>
             `).join('')}
@@ -815,14 +832,15 @@
 
     wrap.innerHTML = list.length === 0 ? `<div class="empty-state">${q ? 'Ничего не найдено.' : 'Клиентов пока нет. Добавьте первого через кнопку выше.'}</div>` : `
         <table>
-          <thead><tr><th>Клиент</th><th>Телефон</th><th>Источник</th><th>Заметки</th><th></th></tr></thead>
+          <thead><tr><th>Клиент</th><th>Телефон</th><th>Источник</th><th>Заметки</th><th>Автор</th><th></th></tr></thead>
           <tbody>
             ${list.map(c => `
               <tr>
-                <td class="cell-name">${escapeHtml(c.name)}<div class="cell-sub">с ${fmtDate(c.createdAt)}${c.createdByEmail ? ' · ' + escapeHtml(c.createdByEmail) : ''}</div></td>
+                <td class="cell-name">${escapeHtml(c.name)}<div class="cell-sub">с ${fmtDate(c.createdAt)}</div></td>
                 <td>${escapeHtml(c.phone||'—')}</td>
                 <td>${escapeHtml(c.source||'—')}</td>
                 <td style="max-width:220px;color:var(--ink-soft);font-size:13px;">${escapeHtml(c.notes||'—')}</td>
+                <td style="color:var(--ink-soft);font-size:12.5px;">${escapeHtml(c.createdByEmail||'—')}</td>
                 <td><div class="row-actions">
                   ${canEdit(c) ? `
                     <button class="btn-ghost-sm" data-edit="${c.id}">Изменить</button>
@@ -1045,18 +1063,19 @@
     el.innerHTML = documents.length === 0 ? `<div class="panel"><div class="empty-state">Документов пока нет.</div></div>` : `
       <div class="panel">
         <table>
-          <thead><tr><th>Тип</th><th>№</th><th>Клиент</th><th>Сумма</th><th>Статус</th><th>Дата</th><th></th></tr></thead>
+          <thead><tr><th>Тип</th><th>№</th><th>Клиент</th><th>Сумма</th><th>Статус</th><th>Дата</th><th>Автор</th><th></th></tr></thead>
           <tbody>
             ${documents.map(d => `
               <tr>
                 <td><span class="badge type-${d.docType}">${docTypeMeta(d.docType).label}</span></td>
                 <td class="mono">${docTypeMeta(d.docType).prefix}-${d.id.padStart(5,'0')}</td>
-                <td>${escapeHtml(d.clientName||'—')}${d.createdByEmail ? `<div class="cell-sub">${escapeHtml(d.createdByEmail)}</div>` : ''}</td>
+                <td>${escapeHtml(d.clientName||'—')}</td>
                 <td>${fmt(d.amount)}</td>
                 <td>${canEdit(d)
                   ? `<select class="status-select" data-status="${d.id}">${DOC_STATUSES.map(s => `<option value="${s.id}" ${d.status===s.id?'selected':''}>${s.label}</option>`).join('')}</select>`
                   : `<span class="badge status-${d.status}">${DOC_STATUSES.find(s=>s.id===d.status)?.label||d.status}</span>`}</td>
                 <td style="color:var(--ink-soft);font-size:13px;">${fmtDate(d.createdAt)}</td>
+                <td style="color:var(--ink-soft);font-size:12.5px;">${escapeHtml(d.createdByEmail||'—')}</td>
                 <td><div class="row-actions">
                   <button class="btn-ghost-sm" data-print="${d.id}">Печать</button>
                   <a class="btn-ghost-sm" href="/api/documents/${d.id}/pdf" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">Скачать PDF</a>
@@ -1239,6 +1258,77 @@
   }
 
   // ---------- Settings ----------
+  // ---------- Пользователи (только для admin) ----------
+  const ROLE_LABELS = { manager: 'Менеджер', admin: 'Администратор' };
+
+  function renderUsers(){
+    const el = document.getElementById('tab-users');
+    if (!currentUser || currentUser.role !== 'admin') {
+      el.innerHTML = '<div class="empty-state">Доступно только администратору.</div>';
+      return;
+    }
+    el.innerHTML = users.length === 0 ? '<div class="panel"><div class="empty-state">Пользователей пока нет.</div></div>' : `
+      <div class="panel">
+        <table>
+          <thead><tr><th>Логин</th><th>Роль</th><th>Создан</th><th>Последний вход</th><th></th></tr></thead>
+          <tbody>
+            ${users.map(u => `
+              <tr>
+                <td class="cell-name">${escapeHtml(u.login)}${String(u.id)===String(currentUser.id) ? ' <span style="color:var(--ink-soft);font-weight:400;">(вы)</span>' : ''}</td>
+                <td><span class="badge role-${u.role}">${ROLE_LABELS[u.role]||u.role}</span></td>
+                <td style="color:var(--ink-soft);font-size:13px;">${fmtDate(u.createdAt)}</td>
+                <td style="color:var(--ink-soft);font-size:13px;">${u.lastLoginAt ? fmtDate(u.lastLoginAt) : '—'}</td>
+                <td><div class="row-actions">
+                  <button class="btn-ghost-sm" data-edit-user="${u.id}">Изменить</button>
+                  ${String(u.id)===String(currentUser.id) ? '' : `<button class="btn-danger-sm" data-del-user="${u.id}">Удалить</button>`}
+                </div></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    el.querySelectorAll('[data-edit-user]').forEach(b => b.addEventListener('click', () => openUserModal(users.find(u => u.id === b.dataset.editUser))));
+    el.querySelectorAll('[data-del-user]').forEach(b => b.addEventListener('click', async () => {
+      if (!confirm('Удалить пользователя? Он больше не сможет войти.')) return;
+      try { await api('DELETE', '/users/' + b.dataset.delUser); await loadAll(); }
+      catch(e) { alert(e.message || 'Не удалось удалить'); }
+    }));
+  }
+
+  function openUserModal(user){
+    const isEdit = !!user;
+    renderModal(`
+      <h3>${isEdit ? 'Изменить пользователя' : 'Новый пользователь'}</h3>
+      ${isEdit ? `<div class="field"><label>Логин</label><input type="text" value="${escapeHtml(user.login)}" disabled style="opacity:0.6;"></div>`
+               : `<div class="field"><label>Логин</label><input id="f_login" type="text" placeholder="manager2" autocomplete="off"></div>`}
+      <div class="field"><label>${isEdit ? 'Новый пароль (необязательно)' : 'Пароль'}</label><input id="f_password" type="text" placeholder="${isEdit ? 'Оставьте пустым, чтобы не менять' : 'Не короче 4 символов'}" autocomplete="new-password"></div>
+      <div class="field"><label>Роль</label>
+        <select id="f_role">
+          <option value="manager" ${(!user||user.role==='manager')?'selected':''}>Менеджер — видит всё, редактирует только своё</option>
+          <option value="admin" ${user&&user.role==='admin'?'selected':''}>Администратор — полный доступ</option>
+        </select>
+      </div>
+    `, async () => {
+      const role = document.getElementById('f_role').value;
+      const password = document.getElementById('f_password').value.trim();
+      try {
+        if (isEdit) {
+          const payload = { role };
+          if (password) payload.password = password;
+          await api('PUT', '/users/' + user.id, payload);
+        } else {
+          const login = document.getElementById('f_login').value.trim();
+          if (!login) return alert('Укажите логин');
+          if (!password) return alert('Укажите пароль');
+          await api('POST', '/users', { login, password, role });
+        }
+        await loadAll();
+        closeModal();
+      } catch(e) { alert(e.message || 'Не удалось сохранить'); }
+    });
+  }
+
   function renderSettings(){
     const el = document.getElementById('tab-settings');
     el.innerHTML = `

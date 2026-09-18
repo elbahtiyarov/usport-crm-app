@@ -1,7 +1,7 @@
 const express = require('express');
-const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
+const { hashPassword, verifyPassword } = require('../passwords');
 
 const router = express.Router();
 
@@ -9,7 +9,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-insecure-secret-change-me';
 
 function isLoginAllowed(login){
   const raw = process.env.ALLOWED_EMAILS;
-  if (!raw || !raw.trim()) return true; // список не задан — доступ открыт всем (см. .env.example)
+  if (!raw || !raw.trim()) return true; // список не задан — самостоятельная регистрация открыта всем
   const allowed = raw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
   return allowed.includes(login.toLowerCase());
 }
@@ -19,22 +19,6 @@ function isAdminLogin(login){
   if (!raw || !raw.trim()) return false;
   const admins = raw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
   return admins.includes(login.toLowerCase());
-}
-
-function hashPassword(password){
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
-  return `${salt}:${hash}`;
-}
-
-function verifyPassword(password, stored){
-  if (!stored) return false;
-  const [salt, hash] = stored.split(':');
-  if (!salt || !hash) return false;
-  const hashBuffer = Buffer.from(hash, 'hex');
-  const suppliedBuffer = crypto.scryptSync(password, salt, 64);
-  if (hashBuffer.length !== suppliedBuffer.length) return false;
-  return crypto.timingSafeEqual(hashBuffer, suppliedBuffer);
 }
 
 function issueSessionCookie(res, user){
@@ -49,8 +33,12 @@ function issueSessionCookie(res, user){
 
 // POST /api/auth/login { login, password }
 // Просто логин (любая строка) + пароль, без проверки формата почты.
-// При первом входе с новым логином пароль просто сохраняется как есть —
-// это и есть регистрация. При следующих входах он проверяется как обычно.
+//
+// Если аккаунт с этим логином уже существует (создан админом в разделе
+// «Пользователи», либо зарегистрирован раньше сам) — всегда можно войти,
+// ALLOWED_EMAILS тут ни при чём, он проверяется, только если пользователя
+// с таким логином ещё нет в базе: пароль в таком случае просто
+// запоминается как новый — это и есть самостоятельная регистрация.
 router.post('/login', async (req, res) => {
   const login = String(req.body.login ?? req.body.email ?? '').trim().toLowerCase();
   const password = String(req.body.password || '');
@@ -61,16 +49,16 @@ router.post('/login', async (req, res) => {
   if (password.length < 4) {
     return res.status(400).json({ error: 'Пароль должен быть не короче 4 символов' });
   }
-  if (!isLoginAllowed(login)) {
-    return res.status(403).json({ error: 'У этого логина нет доступа к системе. Обратитесь к администратору.' });
-  }
 
   try {
-    const shouldBeAdmin = isAdminLogin(login);
     const { rows } = await pool.query('SELECT * FROM users WHERE email=$1', [login]);
     let user = rows[0];
+    const shouldBeAdmin = isAdminLogin(login);
 
     if (!user) {
+      if (!isLoginAllowed(login)) {
+        return res.status(403).json({ error: 'У этого логина нет доступа к системе. Обратитесь к администратору.' });
+      }
       // Первый вход с этим логином — заводим аккаунт и запоминаем пароль.
       const inserted = await pool.query(
         `INSERT INTO users (email, role, password_hash, last_login_at) VALUES ($1,$2,$3, now()) RETURNING *`,
@@ -78,8 +66,8 @@ router.post('/login', async (req, res) => {
       );
       user = inserted.rows[0];
     } else if (!user.password_hash) {
-      // Аккаунт существует (например, с прошлой версии входа по коду),
-      // но пароль ещё не задан — принимаем текущий пароль как новый.
+      // Аккаунт существует (например, создан админом или с прошлой версии
+      // входа по коду), но пароль ещё не задан — принимаем текущий как новый.
       const newRole = shouldBeAdmin && user.role !== 'admin' ? 'admin' : user.role;
       const updated = await pool.query(
         `UPDATE users SET password_hash=$2, role=$3, last_login_at=now() WHERE id=$1 RETURNING *`,

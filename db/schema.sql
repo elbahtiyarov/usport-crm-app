@@ -124,3 +124,7 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS photo_url TEXT;
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS photo_url TEXT;
 ALTER TABLE document_items ADD COLUMN IF NOT EXISTS photo_url TEXT;
 
+-- Кто добавил товар в каталог — только для отображения ("Автор"),
+-- редактировать товар может любой (каталог общий для всей команды).
+ALTER TABLE products ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+
