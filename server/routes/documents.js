@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const { assertOwnership } = require('../ownership');
+const { generateDocumentPdf } = require('../pdf');
 
 function toDateStr(d) { return d ? new Date(d).toISOString().slice(0, 10) : ''; }
 
@@ -119,6 +120,39 @@ router.patch('/:id/status', async (req, res, next) => {
     const { rows } = await pool.query(`UPDATE documents SET status=$1 WHERE id=$2 RETURNING *`, [status, req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Документ не найден' });
     res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// GET /api/documents/:id/pdf — скачать документ в PDF (без диалога печати).
+// Доступно всем, кто вошёл — как и печать, это не редактирование документа.
+router.get('/:id/pdf', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(`${LIST_QUERY} WHERE d.id=$1 ${GROUP_BY}`, [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Документ не найден' });
+    const doc = mapDocument(rows[0]);
+
+    let client = null;
+    if (doc.clientId) {
+      const { rows: clientRows } = await pool.query('SELECT requisites FROM clients WHERE id=$1', [doc.clientId]);
+      client = clientRows[0] || null;
+    }
+
+    const { rows: settingsRows } = await pool.query('SELECT * FROM settings WHERE id=1');
+    const s = settingsRows[0] || {};
+    const settings = {
+      name: s.name || 'USPORT',
+      legalAddress: s.legal_address || '',
+      phone: s.phone || '',
+      email: s.email || '',
+      requisites: s.requisites || '',
+      logoUrl: s.logo_url || ''
+    };
+
+    const buffer = await generateDocumentPdf({ doc, client, settings });
+    const filename = `${doc.docType}-${doc.id}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
   } catch (e) { next(e); }
 });
 
