@@ -29,7 +29,7 @@ function mapDocument(r) {
 const LIST_QUERY = `
   SELECT d.*, u.email AS created_by_email, COALESCE(
     json_agg(
-      json_build_object('id', di.id, 'sku', di.sku, 'name', di.name, 'qty', di.qty, 'price', di.price)
+      json_build_object('id', di.id, 'sku', di.sku, 'name', di.name, 'qty', di.qty, 'price', di.price, 'photoUrl', di.photo_url)
       ORDER BY di.id
     ) FILTER (WHERE di.id IS NOT NULL), '[]'
   ) AS items
@@ -50,8 +50,8 @@ async function insertItems(client, documentId, items) {
   for (const it of items) {
     if (!it.name || !String(it.name).trim()) continue;
     await client.query(
-      `INSERT INTO document_items (document_id, sku, name, qty, price) VALUES ($1,$2,$3,$4,$5)`,
-      [documentId, it.sku || null, it.name, Number(it.qty) || 0, Number(it.price) || 0]
+      `INSERT INTO document_items (document_id, sku, name, qty, price, photo_url) VALUES ($1,$2,$3,$4,$5,$6)`,
+      [documentId, it.sku || null, it.name, Number(it.qty) || 0, Number(it.price) || 0, it.photoUrl || null]
     );
   }
 }

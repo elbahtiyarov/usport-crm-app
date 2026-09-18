@@ -92,9 +92,11 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL UNIQUE,
   name TEXT,
   role TEXT NOT NULL DEFAULT 'manager', -- manager | admin
+  password_hash TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_login_at TIMESTAMPTZ
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
 
 CREATE TABLE IF NOT EXISTS auth_codes (
   id SERIAL PRIMARY KEY,
@@ -114,4 +116,11 @@ CREATE INDEX IF NOT EXISTS idx_auth_codes_email ON auth_codes(email);
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE documents ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+
+-- Фото товара (необязательное) — путь вида /uploads/<файл>
+ALTER TABLE products ADD COLUMN IF NOT EXISTS photo_url TEXT;
+
+-- Фото позиции (переносится из каталога при добавлении в заказ/документ)
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS photo_url TEXT;
+ALTER TABLE document_items ADD COLUMN IF NOT EXISTS photo_url TEXT;
 

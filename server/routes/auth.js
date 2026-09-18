@@ -2,18 +2,10 @@ const express = require('express');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
-const { sendLoginCode } = require('../mailer');
 
 const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-insecure-secret-change-me';
-const CODE_TTL_MINUTES = 10;
-const RESEND_COOLDOWN_SECONDS = 45;
-const MAX_ATTEMPTS = 5;
-
-function hashCode(code){
-  return crypto.createHash('sha256').update(code).digest('hex');
-}
 
 function isEmailAllowed(email){
   const raw = process.env.ALLOWED_EMAILS;
@@ -29,6 +21,22 @@ function isAdminEmail(email){
   return admins.includes(email.toLowerCase());
 }
 
+function hashPassword(password){
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, stored){
+  if (!stored) return false;
+  const [salt, hash] = stored.split(':');
+  if (!salt || !hash) return false;
+  const hashBuffer = Buffer.from(hash, 'hex');
+  const suppliedBuffer = crypto.scryptSync(password, salt, 64);
+  if (hashBuffer.length !== suppliedBuffer.length) return false;
+  return crypto.timingSafeEqual(hashBuffer, suppliedBuffer);
+}
+
 function issueSessionCookie(res, user){
   const token = jwt.sign({ sub: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
   res.cookie('session', token, {
@@ -39,81 +47,49 @@ function issueSessionCookie(res, user){
   });
 }
 
-// POST /api/auth/request-code { email }
-router.post('/request-code', async (req, res) => {
+// POST /api/auth/login { email, password }
+// Почта сейчас не отправляется: при первом входе с новым email пароль
+// просто сохраняется как есть — это и есть регистрация. При следующих
+// входах проверяется совпадение пароля.
+router.post('/login', async (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase();
+  const password = String(req.body.password || '');
+
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ error: 'Некорректный email' });
+  }
+  if (password.length < 4) {
+    return res.status(400).json({ error: 'Пароль должен быть не короче 4 символов' });
   }
   if (!isEmailAllowed(email)) {
     return res.status(403).json({ error: 'У этого email нет доступа к системе. Обратитесь к администратору.' });
   }
 
   try {
-    const recent = await pool.query(
-      `SELECT created_at FROM auth_codes WHERE email=$1 ORDER BY created_at DESC LIMIT 1`,
-      [email]
-    );
-    if (recent.rows[0]) {
-      const secondsSince = (Date.now() - new Date(recent.rows[0].created_at).getTime()) / 1000;
-      if (secondsSince < RESEND_COOLDOWN_SECONDS) {
-        return res.status(429).json({ error: `Подождите ${Math.ceil(RESEND_COOLDOWN_SECONDS - secondsSince)} секунд перед повторной отправкой` });
-      }
-    }
-
-    const code = String(crypto.randomInt(100000, 1000000));
-    const codeHash = hashCode(code);
-    const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES * 60 * 1000);
-
-    await pool.query(
-      `INSERT INTO auth_codes (email, code_hash, expires_at) VALUES ($1,$2,$3)`,
-      [email, codeHash, expiresAt]
-    );
-
-    const result = await sendLoginCode(email, code);
-    // devCode отдаём только если реальная отправка не настроена (локальная разработка без SMTP)
-    res.json({ ok: true, devCode: result.sent ? undefined : result.devCode });
-  } catch (err) {
-    console.error('request-code error', err);
-    res.status(500).json({ error: 'Не удалось отправить код' });
-  }
-});
-
-// POST /api/auth/verify-code { email, code }
-router.post('/verify-code', async (req, res) => {
-  const email = String(req.body.email || '').trim().toLowerCase();
-  const code = String(req.body.code || '').trim();
-  if (!email || !code) return res.status(400).json({ error: 'Укажите email и код' });
-
-  try {
-    const { rows } = await pool.query(
-      `SELECT * FROM auth_codes WHERE email=$1 AND used=false ORDER BY created_at DESC LIMIT 1`,
-      [email]
-    );
-    const record = rows[0];
-    if (!record) return res.status(400).json({ error: 'Код не найден. Запросите новый.' });
-    if (new Date(record.expires_at) < new Date()) return res.status(400).json({ error: 'Код истёк. Запросите новый.' });
-    if (record.attempts >= MAX_ATTEMPTS) return res.status(400).json({ error: 'Слишком много попыток. Запросите новый код.' });
-
-    if (hashCode(code) !== record.code_hash) {
-      await pool.query(`UPDATE auth_codes SET attempts = attempts + 1 WHERE id=$1`, [record.id]);
-      return res.status(400).json({ error: 'Неверный код' });
-    }
-
-    await pool.query(`UPDATE auth_codes SET used=true WHERE id=$1`, [record.id]);
-
-    let { rows: userRows } = await pool.query(`SELECT * FROM users WHERE email=$1`, [email]);
-    let user = userRows[0];
     const shouldBeAdmin = isAdminEmail(email);
+    const { rows } = await pool.query('SELECT * FROM users WHERE email=$1', [email]);
+    let user = rows[0];
+
     if (!user) {
+      // Первый вход с этим email — заводим аккаунт и запоминаем пароль.
       const inserted = await pool.query(
-        `INSERT INTO users (email, role, last_login_at) VALUES ($1, $2, now()) RETURNING *`,
-        [email, shouldBeAdmin ? 'admin' : 'manager']
+        `INSERT INTO users (email, role, password_hash, last_login_at) VALUES ($1,$2,$3, now()) RETURNING *`,
+        [email, shouldBeAdmin ? 'admin' : 'manager', hashPassword(password)]
       );
       user = inserted.rows[0];
+    } else if (!user.password_hash) {
+      // Аккаунт существует (например, с прошлой версии входа по коду),
+      // но пароль ещё не задан — принимаем текущий пароль как новый.
+      const newRole = shouldBeAdmin && user.role !== 'admin' ? 'admin' : user.role;
+      const updated = await pool.query(
+        `UPDATE users SET password_hash=$2, role=$3, last_login_at=now() WHERE id=$1 RETURNING *`,
+        [user.id, hashPassword(password), newRole]
+      );
+      user = updated.rows[0];
     } else {
-      // Повышаем до admin, если email добавили в ADMIN_EMAILS — понижение
-      // делается вручную в базе, чтобы случайно никого не разжаловать.
+      if (!verifyPassword(password, user.password_hash)) {
+        return res.status(401).json({ error: 'Неверный пароль' });
+      }
       const newRole = shouldBeAdmin && user.role !== 'admin' ? 'admin' : user.role;
       const updated = await pool.query(
         `UPDATE users SET last_login_at = now(), role = $2 WHERE id = $1 RETURNING *`,
@@ -125,8 +101,8 @@ router.post('/verify-code', async (req, res) => {
     issueSessionCookie(res, user);
     res.json({ ok: true, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
   } catch (err) {
-    console.error('verify-code error', err);
-    res.status(500).json({ error: 'Не удалось проверить код' });
+    console.error('login error', err);
+    res.status(500).json({ error: 'Не удалось выполнить вход' });
   }
 });
 
