@@ -103,7 +103,8 @@ function parseRuDate(str) {
   return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
 }
 
-// Ищет в листе таблицу позиций КП: строка с "артикул"+"наименование"+"кол-во".
+// Ищет в листе таблицу позиций КП: строка с "наименование"+"кол-во".
+// Колонка с артикулом необязательна — некоторые шаблоны называют её "Код".
 function findKpItemsHeader(ws, fromRow) {
   const maxScan = Math.min(ws.rowCount, fromRow + 15);
   for (let r = fromRow; r <= maxScan; r++) {
@@ -114,12 +115,27 @@ function findKpItemsHeader(ws, fromRow) {
       if (t) map[t] = c;
     }
     const keys = Object.keys(map);
-    const hasSku = keys.some(k => k.includes('артикул'));
     const hasName = keys.some(k => k.includes('наименован'));
     const hasQty = keys.some(k => k.includes('кол-во') || k.includes('кол.во'));
-    if (hasSku && hasName && hasQty) return { rowIndex: r, map, keys };
+    if (hasName && hasQty) return { rowIndex: r, map, keys };
   }
   return null;
+}
+
+// Строит карту "номер строки Excel -> буфер картинки", если в листе есть
+// встроенные изображения (типично для колонки "Рисунок"/"Фото" в КП).
+function buildRowImageMap(workbook, ws) {
+  const map = {};
+  let images = [];
+  try { images = ws.getImages ? ws.getImages() : []; } catch (e) { images = []; }
+  const media = (workbook.model && workbook.model.media) || [];
+  for (const img of images) {
+    const anchorRow = img.range && img.range.tl ? Math.round(img.range.tl.nativeRow) + 1 : null;
+    if (anchorRow == null) continue;
+    const m = media[img.imageId];
+    if (m && m.buffer) map[anchorRow] = { buffer: m.buffer, extension: m.extension || 'png' };
+  }
+  return map;
 }
 
 // Возвращает массив документов [{ clientName, validUntil, notes, items }],
@@ -154,23 +170,33 @@ function parseDocuments(workbook) {
       const items = [];
       if (itemsHeader) {
         const { rowIndex, map, keys } = itemsHeader;
-        const skuCol = findColumn(map, keys, k => k.includes('артикул'));
+        const skuCol = findColumn(map, keys, k => k.includes('артикул') || k.includes('код'));
         const nameCol = findColumn(map, keys, k => k.includes('наименован'));
         const qtyCol = findColumn(map, keys, k => k.includes('кол-во') || k.includes('кол.во'));
         const discountedPriceCol = findColumn(map, keys, k => k.includes('цена') && k.includes('скидк'));
         const plainPriceCol = findColumn(map, keys, k => k.includes('цена') && !k.includes('скидк'));
         const priceCol = discountedPriceCol || plainPriceCol;
+        const rowImageMap = buildRowImageMap(workbook, ws);
 
+        let emptyStreak = 0;
         for (let rr = rowIndex + 1; rr <= ws.rowCount; rr++) {
           const irow = ws.getRow(rr);
           const anyText = irow.values ? irow.values.join(' ') : '';
           if (/итого/i.test(anyText)) break;
           const name = nameCol ? cellText(irow.getCell(nameCol)).trim() : '';
           const qty = qtyCol ? cellNumber(irow.getCell(qtyCol)) : null;
-          if (!name || !qty) continue;
+          if (!name || !qty) {
+            emptyStreak++;
+            if (emptyStreak > 5) break; // похоже, таблица закончилась
+            continue;
+          }
+          emptyStreak = 0;
           const price = priceCol ? (cellNumber(irow.getCell(priceCol)) || 0) : 0;
           const sku = skuCol ? cellText(irow.getCell(skuCol)).trim() : '';
-          items.push({ sku, name, qty, price });
+          const item = { sku, name, qty, price };
+          const img = rowImageMap[rr];
+          if (img) { item.imageBuffer = img.buffer; item.imageExtension = img.extension; }
+          items.push(item);
         }
       }
 

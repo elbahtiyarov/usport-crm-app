@@ -1,9 +1,21 @@
 const express = require('express');
 const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
 const ExcelJS = require('exceljs');
 const router = express.Router();
 const pool = require('../db');
 const { parseProducts, parseDocuments } = require('../importExcel');
+
+const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
+
+function saveExtractedImage(buffer, extension){
+  const ext = (extension || 'png').replace(/[^a-z0-9]/gi, '') || 'png';
+  const filename = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}.${ext}`;
+  fs.writeFileSync(path.join(UPLOADS_DIR, filename), buffer);
+  return '/uploads/' + filename;
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -78,9 +90,14 @@ router.post('/documents', upload.single('file'), async (req, res, next) => {
           [d.clientName, amount, d.notes, d.validUntil || null, req.userId]
         );
         for (const it of d.items) {
+          let photoUrl = null;
+          if (it.imageBuffer) {
+            try { photoUrl = saveExtractedImage(it.imageBuffer, it.imageExtension); }
+            catch (e) { console.error('Не удалось сохранить картинку позиции из Excel:', e.message); }
+          }
           await client.query(
-            `INSERT INTO document_items (document_id, sku, name, qty, price) VALUES ($1,$2,$3,$4,$5)`,
-            [rows[0].id, it.sku || null, it.name, it.qty, it.price]
+            `INSERT INTO document_items (document_id, sku, name, qty, price, photo_url) VALUES ($1,$2,$3,$4,$5,$6)`,
+            [rows[0].id, it.sku || null, it.name, it.qty, it.price, photoUrl]
           );
         }
         await client.query('COMMIT');
