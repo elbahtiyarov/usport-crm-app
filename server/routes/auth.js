@@ -7,18 +7,18 @@ const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-insecure-secret-change-me';
 
-function isEmailAllowed(email){
+function isLoginAllowed(login){
   const raw = process.env.ALLOWED_EMAILS;
   if (!raw || !raw.trim()) return true; // список не задан — доступ открыт всем (см. .env.example)
   const allowed = raw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-  return allowed.includes(email.toLowerCase());
+  return allowed.includes(login.toLowerCase());
 }
 
-function isAdminEmail(email){
+function isAdminLogin(login){
   const raw = process.env.ADMIN_EMAILS;
   if (!raw || !raw.trim()) return false;
   const admins = raw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-  return admins.includes(email.toLowerCase());
+  return admins.includes(login.toLowerCase());
 }
 
 function hashPassword(password){
@@ -47,34 +47,34 @@ function issueSessionCookie(res, user){
   });
 }
 
-// POST /api/auth/login { email, password }
-// Почта сейчас не отправляется: при первом входе с новым email пароль
-// просто сохраняется как есть — это и есть регистрация. При следующих
-// входах проверяется совпадение пароля.
+// POST /api/auth/login { login, password }
+// Просто логин (любая строка) + пароль, без проверки формата почты.
+// При первом входе с новым логином пароль просто сохраняется как есть —
+// это и есть регистрация. При следующих входах он проверяется как обычно.
 router.post('/login', async (req, res) => {
-  const email = String(req.body.email || '').trim().toLowerCase();
+  const login = String(req.body.login ?? req.body.email ?? '').trim().toLowerCase();
   const password = String(req.body.password || '');
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ error: 'Некорректный email' });
+  if (login.length < 2 || login.length > 190) {
+    return res.status(400).json({ error: 'Логин должен быть от 2 до 190 символов' });
   }
   if (password.length < 4) {
     return res.status(400).json({ error: 'Пароль должен быть не короче 4 символов' });
   }
-  if (!isEmailAllowed(email)) {
-    return res.status(403).json({ error: 'У этого email нет доступа к системе. Обратитесь к администратору.' });
+  if (!isLoginAllowed(login)) {
+    return res.status(403).json({ error: 'У этого логина нет доступа к системе. Обратитесь к администратору.' });
   }
 
   try {
-    const shouldBeAdmin = isAdminEmail(email);
-    const { rows } = await pool.query('SELECT * FROM users WHERE email=$1', [email]);
+    const shouldBeAdmin = isAdminLogin(login);
+    const { rows } = await pool.query('SELECT * FROM users WHERE email=$1', [login]);
     let user = rows[0];
 
     if (!user) {
-      // Первый вход с этим email — заводим аккаунт и запоминаем пароль.
+      // Первый вход с этим логином — заводим аккаунт и запоминаем пароль.
       const inserted = await pool.query(
         `INSERT INTO users (email, role, password_hash, last_login_at) VALUES ($1,$2,$3, now()) RETURNING *`,
-        [email, shouldBeAdmin ? 'admin' : 'manager', hashPassword(password)]
+        [login, shouldBeAdmin ? 'admin' : 'manager', hashPassword(password)]
       );
       user = inserted.rows[0];
     } else if (!user.password_hash) {

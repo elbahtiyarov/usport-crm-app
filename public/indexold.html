@@ -126,6 +126,8 @@
   .cell-sub { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
   .empty-state { padding: 60px 20px; text-align: center; color: var(--ink-soft); font-size: 14px; }
   .mono { font-family: 'Barlow Condensed', sans-serif; font-weight: 600; letter-spacing: 0.02em; }
+  .product-thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; display: block; background: var(--chip); }
+  .product-thumb-empty { border: 1px dashed var(--line); }
 
   .status-select { border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font-size: 12.5px; background: var(--canvas); color: var(--ink); font-weight: 500; }
   .row-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
@@ -243,11 +245,12 @@
       text-transform: uppercase; letter-spacing: 0.02em;
     }
     .kp-table td { border: 1px solid #D8DCE3; padding: 8px 10px; }
-    .kp-table td:nth-child(1) { width: 34px; color: #888; }
     .kp-table th { white-space: nowrap; }
-    .kp-table td:nth-child(3), .kp-table th:nth-child(3) { text-align: center; width: 80px; }
-    .kp-table td:nth-child(4), .kp-table th:nth-child(4),
-    .kp-table td:nth-child(5), .kp-table th:nth-child(5) { text-align: right; width: 110px; }
+    .kp-photo-th, .kp-photo-td { width: 44px; }
+    .kp-num-td { width: 34px; color: #888; }
+    .kp-qty-th, .kp-qty-td { text-align: center; width: 80px; }
+    .kp-price-th, .kp-price-td, .kp-sum-th, .kp-sum-td { text-align: right; width: 110px; }
+    .kp-item-photo { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; display: block; }
     .kp-table tbody tr:nth-child(even) td { background: #F7F8FA !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .kp-table tfoot td {
       font-weight: 700; font-size: 13.5px; border-top: 2px solid #14294D; border-bottom: none;
@@ -338,24 +341,12 @@
     <img src="/logo.png" alt="USPORT">
     <h2 class="display">USPORT CRM</h2>
 
-    <div id="loginStepEmail">
-      <p class="login-sub">Введите рабочую почту — пришлём код для входа</p>
-      <input type="email" id="loginEmail" placeholder="you@company.kz" autocomplete="email">
-      <button class="btn-primary login-btn" id="requestCodeBtn">Получить код</button>
-    </div>
-
-    <div id="loginStepCode" style="display:none;">
-      <p class="login-sub">Код отправлен на <strong id="loginEmailShown"></strong></p>
-      <input type="text" id="loginCode" placeholder="6-значный код" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
-      <button class="btn-primary login-btn" id="verifyCodeBtn">Войти</button>
-      <div class="login-links">
-        <button type="button" class="btn-ghost-sm" id="resendCodeBtn">Отправить код ещё раз</button>
-        <button type="button" class="btn-ghost-sm" id="backToEmailBtn">Изменить email</button>
-      </div>
-    </div>
+    <p class="login-sub">Логин и пароль. Если входите впервые — этот пароль запомнится как ваш.</p>
+    <input type="text" id="loginEmail" placeholder="ваш логин" autocomplete="username">
+    <input type="password" id="loginPassword" placeholder="Пароль" autocomplete="current-password">
+    <button class="btn-primary login-btn" id="loginBtn">Войти</button>
 
     <div class="login-error" id="loginError" style="display:none;"></div>
-    <div class="login-dev-hint" id="loginDevHint" style="display:none;"></div>
   </div>
 </div>
 
@@ -478,7 +469,6 @@
   let productSearch = '', clientSearch = '';
   let modalItems = [];
   let currentUser = null;
-  let pendingEmail = '';
 
   // ---------- API layer ----------
   async function api(method, path, body){
@@ -535,53 +525,24 @@
     } catch(e) { showLogin(); }
   }
 
-  async function requestCode(email){
+  async function doLogin(){
+    const login = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    if (!login) return setLoginError('Введите логин');
+    if (!password) return setLoginError('Введите пароль');
     setLoginError('');
     try {
-      const res = await fetch('/api/auth/request-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+      const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login, password }) });
       const data = await res.json();
-      if (!res.ok) { setLoginError(data.error || 'Не удалось отправить код'); return false; }
-      pendingEmail = email;
-      document.getElementById('loginEmailShown').textContent = email;
-      document.getElementById('loginStepEmail').style.display = 'none';
-      document.getElementById('loginStepCode').style.display = 'block';
-      document.getElementById('loginCode').value = '';
-      document.getElementById('loginCode').focus();
-      const hint = document.getElementById('loginDevHint');
-      if (data.devCode) { hint.textContent = 'SMTP не настроен — код (только для разработки): ' + data.devCode; hint.style.display = 'block'; }
-      else hint.style.display = 'none';
-      return true;
-    } catch(e) { setLoginError('Не удалось отправить запрос'); return false; }
-  }
-
-  document.getElementById('requestCodeBtn').addEventListener('click', () => {
-    const email = document.getElementById('loginEmail').value.trim();
-    if (!email) return setLoginError('Введите email');
-    requestCode(email);
-  });
-  document.getElementById('loginEmail').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('requestCodeBtn').click(); });
-
-  document.getElementById('verifyCodeBtn').addEventListener('click', async () => {
-    const code = document.getElementById('loginCode').value.trim();
-    if (!code) return setLoginError('Введите код из письма');
-    setLoginError('');
-    try {
-      const res = await fetch('/api/auth/verify-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: pendingEmail, code }) });
-      const data = await res.json();
-      if (!res.ok) return setLoginError(data.error || 'Неверный код');
+      if (!res.ok) return setLoginError(data.error || 'Не удалось войти');
       currentUser = data.user;
       showApp();
       loadAll();
-    } catch(e) { setLoginError('Не удалось проверить код'); }
-  });
-  document.getElementById('loginCode').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('verifyCodeBtn').click(); });
-
-  document.getElementById('resendCodeBtn').addEventListener('click', () => { if (pendingEmail) requestCode(pendingEmail); });
-  document.getElementById('backToEmailBtn').addEventListener('click', () => {
-    document.getElementById('loginStepCode').style.display = 'none';
-    document.getElementById('loginStepEmail').style.display = 'block';
-    setLoginError(''); document.getElementById('loginDevHint').style.display = 'none';
-  });
+    } catch(e) { setLoginError('Не удалось войти'); }
+  }
+  document.getElementById('loginBtn').addEventListener('click', doLogin);
+  document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('loginEmail').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('loginPassword').focus(); });
 
   function setConnected(ok){
     document.getElementById('saveDot').classList.toggle('offline', !ok);
@@ -720,17 +681,30 @@
   // ---------- Products ----------
   function renderProducts(){
     const el = document.getElementById('tab-products');
-    const q = productSearch.trim().toLowerCase();
-    const list = q ? products.filter(p => (p.name||'').toLowerCase().includes(q) || (p.sku||'').toLowerCase().includes(q)) : products;
     el.innerHTML = `
       <div class="panel">
         <div class="search-row"><input type="text" id="productSearchInput" placeholder="Поиск по названию или артикулу" value="${escapeHtml(productSearch)}"></div>
-        ${list.length === 0 ? '<div class="empty-state">Товаров пока нет. Добавьте первый через кнопку выше.</div>' : `
+        <div id="productsListWrap"></div>
+      </div>
+    `;
+    renderProductsList();
+
+    const search = document.getElementById('productSearchInput');
+    search.addEventListener('input', e => { productSearch = e.target.value; renderProductsList(); });
+  }
+
+  function renderProductsList(){
+    const wrap = document.getElementById('productsListWrap');
+    const q = productSearch.trim().toLowerCase();
+    const list = q ? products.filter(p => (p.name||'').toLowerCase().includes(q) || (p.sku||'').toLowerCase().includes(q)) : products;
+
+    wrap.innerHTML = list.length === 0 ? `<div class="empty-state">${q ? 'Ничего не найдено.' : 'Товаров пока нет. Добавьте первый через кнопку выше.'}</div>` : `
         <table>
-          <thead><tr><th>Артикул</th><th>Наименование</th><th>Категория</th><th>Цена</th><th>Характеристики</th><th></th></tr></thead>
+          <thead><tr><th></th><th>Артикул</th><th>Наименование</th><th>Категория</th><th>Цена</th><th>Характеристики</th><th></th></tr></thead>
           <tbody>
             ${list.map(p => `
               <tr>
+                <td>${p.photoUrl ? `<img src="${p.photoUrl}" alt="" class="product-thumb">` : `<div class="product-thumb product-thumb-empty"></div>`}</td>
                 <td class="mono">${escapeHtml(p.sku||'—')}</td>
                 <td class="cell-name">${escapeHtml(p.name)}</td>
                 <td>${escapeHtml(p.category||'—')}</td>
@@ -743,19 +717,35 @@
               </tr>
             `).join('')}
           </tbody>
-        </table>`}
-      </div>
-    `;
-    const search = document.getElementById('productSearchInput');
-    if (search) search.addEventListener('input', e => { productSearch = e.target.value; renderProducts(); });
-    el.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openProductModal(products.find(p => p.id === b.dataset.edit))));
-    el.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => { if (confirm('Удалить товар из каталога?')) deleteDoc('products', b.dataset.del); }));
+        </table>`;
+
+    wrap.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openProductModal(products.find(p => p.id === b.dataset.edit))));
+    wrap.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => { if (confirm('Удалить товар из каталога?')) deleteDoc('products', b.dataset.del); }));
   }
+
+  let productPhotoFile = null;
+  let productPhotoRemoved = false;
 
   function openProductModal(product){
     const isEdit = !!product;
+    productPhotoFile = null;
+    productPhotoRemoved = false;
+    const currentPhoto = product?.photoUrl || '';
+
     renderModal(`
       <h3>${isEdit ? 'Изменить товар' : 'Новый товар'}</h3>
+      <div class="field">
+        <label>Фото (необязательно)</label>
+        <div class="logo-row">
+          <div class="logo-preview" id="productPhotoPreview">${currentPhoto ? `<img src="${currentPhoto}" alt="">` : '<span>Без фото</span>'}</div>
+          <div>
+            <label class="file-input-label" for="productPhotoInput">Загрузить фото</label>
+            <input type="file" id="productPhotoInput" accept="image/*" style="display:none;">
+            ${currentPhoto ? '<button type="button" class="btn-ghost-sm" id="removeProductPhotoBtn" style="margin-left:8px;">Удалить</button>' : ''}
+            <div style="font-size:12px;color:var(--ink-soft);margin-top:6px;">JPG или PNG, до 4 МБ. Можно сохранить и без фото.</div>
+          </div>
+        </div>
+      </div>
       <div class="field-row">
         <div class="field"><label>Артикул</label><input id="f_sku" type="text" value="${escapeHtml(product?.sku||'')}" placeholder="USP-001"></div>
         <div class="field"><label>Категория</label><select id="f_category">${CATEGORIES.map(c => `<option ${product?.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
@@ -766,21 +756,62 @@
     `, async () => {
       const name = getVal('f_name').trim();
       if (!name) return alert('Укажите наименование товара');
-      const data = { sku: getVal('f_sku').trim(), category: getVal('f_category'), name, price: Number(getVal('f_price') || 0), specs: getVal('f_specs').trim() };
+
+      let photoUrl = productPhotoRemoved ? '' : currentPhoto;
+      if (productPhotoFile) {
+        try {
+          const fd = new FormData();
+          fd.append('photo', productPhotoFile);
+          const res = await fetch('/api/products/upload-photo', { method: 'POST', body: fd });
+          const uploadData = await res.json();
+          if (!res.ok) { alert(uploadData.error || 'Не удалось загрузить фото'); return; }
+          photoUrl = uploadData.url;
+        } catch (e) { alert('Не удалось загрузить фото'); return; }
+      }
+
+      const data = { sku: getVal('f_sku').trim(), category: getVal('f_category'), name, price: Number(getVal('f_price') || 0), specs: getVal('f_specs').trim(), photoUrl };
       if (isEdit) await updateDoc('products', product.id, data); else await addDoc('products', data);
       closeModal();
+    });
+
+    document.getElementById('productPhotoInput').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      productPhotoFile = file;
+      productPhotoRemoved = false;
+      const reader = new FileReader();
+      reader.onload = ev => { document.getElementById('productPhotoPreview').innerHTML = `<img src="${ev.target.result}" alt="">`; };
+      reader.readAsDataURL(file);
+    });
+    const removeBtn = document.getElementById('removeProductPhotoBtn');
+    if (removeBtn) removeBtn.addEventListener('click', () => {
+      productPhotoFile = null;
+      productPhotoRemoved = true;
+      document.getElementById('productPhotoPreview').innerHTML = '<span>Без фото</span>';
+      removeBtn.remove();
     });
   }
 
   // ---------- Clients ----------
   function renderClients(){
     const el = document.getElementById('tab-clients');
-    const q = clientSearch.trim().toLowerCase();
-    const list = q ? clients.filter(c => (c.name||'').toLowerCase().includes(q) || (c.phone||'').includes(q)) : clients;
     el.innerHTML = `
       <div class="panel">
         <div class="search-row"><input type="text" id="clientSearchInput" placeholder="Поиск по имени или телефону" value="${escapeHtml(clientSearch)}"></div>
-        ${list.length === 0 ? '<div class="empty-state">Клиентов пока нет. Добавьте первого через кнопку выше.</div>' : `
+        <div id="clientsListWrap"></div>
+      </div>
+    `;
+    renderClientsList();
+    const search = document.getElementById('clientSearchInput');
+    search.addEventListener('input', e => { clientSearch = e.target.value; renderClientsList(); });
+  }
+
+  function renderClientsList(){
+    const wrap = document.getElementById('clientsListWrap');
+    const q = clientSearch.trim().toLowerCase();
+    const list = q ? clients.filter(c => (c.name||'').toLowerCase().includes(q) || (c.phone||'').includes(q)) : clients;
+
+    wrap.innerHTML = list.length === 0 ? `<div class="empty-state">${q ? 'Ничего не найдено.' : 'Клиентов пока нет. Добавьте первого через кнопку выше.'}</div>` : `
         <table>
           <thead><tr><th>Клиент</th><th>Телефон</th><th>Источник</th><th>Заметки</th><th></th></tr></thead>
           <tbody>
@@ -799,13 +830,10 @@
               </tr>
             `).join('')}
           </tbody>
-        </table>`}
-      </div>
-    `;
-    const search = document.getElementById('clientSearchInput');
-    if (search) search.addEventListener('input', e => { clientSearch = e.target.value; renderClients(); });
-    el.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openClientModal(clients.find(c => c.id === b.dataset.edit))));
-    el.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => { if (confirm('Удалить клиента?')) deleteDoc('clients', b.dataset.del); }));
+        </table>`;
+
+    wrap.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openClientModal(clients.find(c => c.id === b.dataset.edit))));
+    wrap.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => { if (confirm('Удалить клиента?')) deleteDoc('clients', b.dataset.del); }));
   }
 
   function openClientModal(client){
@@ -930,7 +958,7 @@
         searchInput.focus();
         return;
       }
-      modalItems.push({ name: p.name, qty: 1, price: p.price, sku: p.sku||'' });
+      modalItems.push({ name: p.name, qty: 1, price: p.price, sku: p.sku||'', photoUrl: p.photoUrl||'' });
       rerenderItemRows();
       searchInput.value = '';
       catalogPick.innerHTML = renderCatalogOptions();
@@ -1000,7 +1028,7 @@
     `, async () => {
       const clientId = getVal('f_client');
       const client = clients.find(c => c.id === clientId);
-      const items = modalItems.filter(it => (it.name||'').trim() !== '').map(it => ({ name: it.name.trim(), qty: Number(it.qty)||0, price: Number(it.price)||0, sku: it.sku||'' }));
+      const items = modalItems.filter(it => (it.name||'').trim() !== '').map(it => ({ name: it.name.trim(), qty: Number(it.qty)||0, price: Number(it.price)||0, sku: it.sku||'', photoUrl: it.photoUrl||'' }));
       const data = { clientId: clientId || null, clientName: client ? client.name : 'Без клиента', items, stage: getVal('f_stage') };
       if (isEdit) await updateDoc('orders', order.id, data); else await addDoc('orders', data);
       closeModal();
@@ -1096,7 +1124,7 @@
       const type = getVal('f_doctype');
       const clientId = getVal('f_client');
       const client = clients.find(c => c.id === clientId);
-      const items = modalItems.filter(it => (it.name||'').trim() !== '').map(it => ({ name: it.name.trim(), qty: Number(it.qty)||0, price: Number(it.price)||0, sku: it.sku||'' }));
+      const items = modalItems.filter(it => (it.name||'').trim() !== '').map(it => ({ name: it.name.trim(), qty: Number(it.qty)||0, price: Number(it.price)||0, sku: it.sku||'', photoUrl: it.photoUrl||'' }));
       if (items.length === 0 && type !== 'contract') return alert('Добавьте хотя бы одну позицию');
       const data = {
         docType: type, clientId: clientId || null, clientName: client ? client.name : 'Без клиента', orderId: presetOrderId,
@@ -1129,10 +1157,12 @@
     const logoHtml = `<img src="${logoSrc}" alt="logo" class="kp-logo-img">`;
     const companyLine = [settings.legalAddress, settings.phone, settings.email].filter(Boolean).map(escapeHtml).join(' · ');
 
-    const rowsHtml = (doc.items||[]).map((it, i) => `<tr><td>${i+1}</td><td>${escapeHtml(it.name)}</td><td>${it.qty}</td><td>${fmt(it.price)}</td><td>${fmt(it.qty*it.price)}</td></tr>`).join('');
+    const hasPhotos = (doc.items||[]).some(it => it.photoUrl);
+    const photoTh = hasPhotos ? '<th class="kp-photo-th"></th>' : '';
+    const rowsHtml = (doc.items||[]).map((it, i) => `<tr>${hasPhotos ? `<td class="kp-photo-td">${it.photoUrl ? `<img src="${it.photoUrl}" class="kp-item-photo" alt="">` : ''}</td>` : ''}<td class="kp-num-td">${i+1}</td><td>${escapeHtml(it.name)}</td><td class="kp-qty-td">${it.qty}</td><td class="kp-price-td">${fmt(it.price)}</td><td class="kp-sum-td">${fmt(it.qty*it.price)}</td></tr>`).join('');
     const itemsTable = (doc.items||[]).length ? `
-      <table class="kp-table"><thead><tr><th>№</th><th>Наименование</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr></thead>
-      <tbody>${rowsHtml}</tbody><tfoot><tr><td colspan="4">Итого</td><td>${fmt(doc.amount)}</td></tr></tfoot></table>` : '';
+      <table class="kp-table"><thead><tr>${photoTh}<th>№</th><th>Наименование</th><th class="kp-qty-th">Кол-во</th><th class="kp-price-th">Цена</th><th class="kp-sum-th">Сумма</th></tr></thead>
+      <tbody>${rowsHtml}</tbody><tfoot><tr><td colspan="${hasPhotos ? 5 : 4}">Итого</td><td>${fmt(doc.amount)}</td></tr></tfoot></table>` : '';
 
     let extraLine = '';
     if (doc.docType === 'kp' && doc.validUntil) extraLine = `<div class="kp-line-item"><span class="kp-line-label">Действительно до:</span><span>${new Date(doc.validUntil).toLocaleDateString('ru-RU')}</span></div>`;

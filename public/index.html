@@ -248,6 +248,8 @@
     .kp-table th { white-space: nowrap; }
     .kp-photo-th, .kp-photo-td { width: 44px; }
     .kp-num-td { width: 34px; color: #888; }
+    .kp-sku-th, .kp-sku-td { width: 90px; }
+    .kp-sku-td { color: #666; font-family: 'Barlow Condensed', Arial, sans-serif; font-weight: 600; letter-spacing: 0.02em; }
     .kp-qty-th, .kp-qty-td { text-align: center; width: 80px; }
     .kp-price-th, .kp-price-td, .kp-sum-th, .kp-sum-td { text-align: right; width: 110px; }
     .kp-item-photo { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; display: block; }
@@ -341,8 +343,8 @@
     <img src="/logo.png" alt="USPORT">
     <h2 class="display">USPORT CRM</h2>
 
-    <p class="login-sub">Email и пароль. Если входите впервые — этот пароль запомнится как ваш.</p>
-    <input type="email" id="loginEmail" placeholder="you@company.kz" autocomplete="email">
+    <p class="login-sub">Логин и пароль. Если входите впервые — этот пароль запомнится как ваш.</p>
+    <input type="text" id="loginEmail" placeholder="ваш логин" autocomplete="username">
     <input type="password" id="loginPassword" placeholder="Пароль" autocomplete="current-password">
     <button class="btn-primary login-btn" id="loginBtn">Войти</button>
 
@@ -526,13 +528,13 @@
   }
 
   async function doLogin(){
-    const email = document.getElementById('loginEmail').value.trim();
+    const login = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
-    if (!email) return setLoginError('Введите email');
+    if (!login) return setLoginError('Введите логин');
     if (!password) return setLoginError('Введите пароль');
     setLoginError('');
     try {
-      const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+      const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login, password }) });
       const data = await res.json();
       if (!res.ok) return setLoginError(data.error || 'Не удалось войти');
       currentUser = data.user;
@@ -1159,10 +1161,10 @@
 
     const hasPhotos = (doc.items||[]).some(it => it.photoUrl);
     const photoTh = hasPhotos ? '<th class="kp-photo-th"></th>' : '';
-    const rowsHtml = (doc.items||[]).map((it, i) => `<tr>${hasPhotos ? `<td class="kp-photo-td">${it.photoUrl ? `<img src="${it.photoUrl}" class="kp-item-photo" alt="">` : ''}</td>` : ''}<td class="kp-num-td">${i+1}</td><td>${escapeHtml(it.name)}</td><td class="kp-qty-td">${it.qty}</td><td class="kp-price-td">${fmt(it.price)}</td><td class="kp-sum-td">${fmt(it.qty*it.price)}</td></tr>`).join('');
+    const rowsHtml = (doc.items||[]).map((it, i) => `<tr>${hasPhotos ? `<td class="kp-photo-td">${it.photoUrl ? `<img src="${it.photoUrl}" class="kp-item-photo" alt="">` : ''}</td>` : ''}<td class="kp-num-td">${i+1}</td><td class="kp-sku-td">${escapeHtml(it.sku||'—')}</td><td>${escapeHtml(it.name)}</td><td class="kp-qty-td">${it.qty}</td><td class="kp-price-td">${fmt(it.price)}</td><td class="kp-sum-td">${fmt(it.qty*it.price)}</td></tr>`).join('');
     const itemsTable = (doc.items||[]).length ? `
-      <table class="kp-table"><thead><tr>${photoTh}<th>№</th><th>Наименование</th><th class="kp-qty-th">Кол-во</th><th class="kp-price-th">Цена</th><th class="kp-sum-th">Сумма</th></tr></thead>
-      <tbody>${rowsHtml}</tbody><tfoot><tr><td colspan="${hasPhotos ? 5 : 4}">Итого</td><td>${fmt(doc.amount)}</td></tr></tfoot></table>` : '';
+      <table class="kp-table"><thead><tr>${photoTh}<th>№</th><th class="kp-sku-th">Артикул</th><th>Наименование</th><th class="kp-qty-th">Кол-во</th><th class="kp-price-th">Цена</th><th class="kp-sum-th">Сумма</th></tr></thead>
+      <tbody>${rowsHtml}</tbody><tfoot><tr><td colspan="${hasPhotos ? 6 : 5}">Итого</td><td>${fmt(doc.amount)}</td></tr></tfoot></table>` : '';
 
     let extraLine = '';
     if (doc.docType === 'kp' && doc.validUntil) extraLine = `<div class="kp-line-item"><span class="kp-line-label">Действительно до:</span><span>${new Date(doc.validUntil).toLocaleDateString('ru-RU')}</span></div>`;
