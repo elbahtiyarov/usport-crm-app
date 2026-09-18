@@ -128,3 +128,15 @@ ALTER TABLE document_items ADD COLUMN IF NOT EXISTS photo_url TEXT;
 -- редактировать товар может любой (каталог общий для всей команды).
 ALTER TABLE products ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
 
+-- Категории товаров — редактируемый список (раньше был зашит в коде).
+CREATE TABLE IF NOT EXISTS categories (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+);
+-- Стартовый набор — те же категории, что раньше были жёстко зашиты.
+-- ON CONFLICT ничего не делает, если их уже добавили/переименовали.
+INSERT INTO categories (name) VALUES ('Обувь'), ('Одежда'), ('Инвентарь'), ('Аксессуары'), ('Прочее')
+ON CONFLICT (name) DO NOTHING;
+

@@ -10,6 +10,7 @@ const ordersRouter = require('./routes/orders');
 const documentsRouter = require('./routes/documents');
 const settingsRouter = require('./routes/settings');
 const importRouter = require('./routes/import');
+const categoriesRouter = require('./routes/categories');
 const usersRouter = require('./routes/users');
 const authRouter = require('./routes/auth');
 const requireAuth = require('./middleware/requireAuth');
@@ -35,6 +36,7 @@ app.use('/api/orders', requireAuth, ordersRouter);
 app.use('/api/documents', requireAuth, documentsRouter);
 app.use('/api/settings', requireAuth, settingsRouter);
 app.use('/api/import', requireAuth, importRouter);
+app.use('/api/categories', requireAuth, categoriesRouter);
 app.use('/api/users', requireAuth, requireAdmin, usersRouter);
 
 // Отдаём фронтенд как статику (index.html лежит в ../public)

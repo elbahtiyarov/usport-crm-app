@@ -361,6 +361,10 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
     Товары <span class="nav-count" id="navCountProducts">0</span>
   </button>
+  <button class="nav-item" data-tab="categories">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.6 12.6l-7.9 7.9a2 2 0 0 1-2.8 0l-6.4-6.4a2 2 0 0 1 0-2.8l7.9-7.9a2 2 0 0 1 1.4-.6h6a2 2 0 0 1 2 2v6a2 2 0 0 1-.2.8z"/><circle cx="15.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/></svg>
+    Категории <span class="nav-count" id="navCountCategories">0</span>
+  </button>
   <button class="nav-item" data-tab="clients">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>
     Клиенты <span class="nav-count" id="navCountClients">0</span>
@@ -422,6 +426,7 @@
 
   <div class="content">
     <div id="tab-products"></div>
+    <div id="tab-categories" style="display:none"></div>
     <div id="tab-clients" style="display:none"></div>
     <div id="tab-orders" style="display:none"></div>
     <div id="tab-documents" style="display:none"></div>
@@ -447,7 +452,8 @@
     { id: 'cancelled', label: 'Отменён' }
   ];
   const SOURCES = ['Instagram', 'WhatsApp', 'Звонок', 'Сайт', 'Рекомендация'];
-  const CATEGORIES = ['Обувь', 'Одежда', 'Инвентарь', 'Аксессуары', 'Прочее'];
+  // Категории теперь редактируются в разделе «Категории» (см. renderCategories) —
+  // список берётся из массива categories, а не зашит здесь.
   const DOC_TYPES = [
     { id: 'kp', label: 'КП', title: 'Коммерческое предложение', prefix: 'КП' },
     { id: 'invoice', label: 'Счёт', title: 'Счёт на оплату', prefix: 'СЧ' },
@@ -474,7 +480,7 @@
   }
 
   let activeTab = 'products';
-  let products = [], clients = [], orders = [], documents = [], users = [], settings = { name: 'USPORT' };
+  let products = [], clients = [], orders = [], documents = [], users = [], categories = [], settings = { name: 'USPORT' };
   let productSearch = '', clientSearch = '';
   let modalItems = [];
   let currentUser = null;
@@ -561,11 +567,11 @@
 
   async function loadAll(){
     try {
-      const calls = [api('GET', '/products'), api('GET', '/clients'), api('GET', '/orders'), api('GET', '/documents'), api('GET', '/settings')];
+      const calls = [api('GET', '/products'), api('GET', '/clients'), api('GET', '/orders'), api('GET', '/documents'), api('GET', '/settings'), api('GET', '/categories')];
       if (currentUser && currentUser.role === 'admin') calls.push(api('GET', '/users'));
       const results = await Promise.all(calls);
-      [products, clients, orders, documents, settings] = results;
-      if (currentUser && currentUser.role === 'admin') users = results[5];
+      [products, clients, orders, documents, settings, categories] = results;
+      if (currentUser && currentUser.role === 'admin') users = results[6];
       setConnected(true);
       renderSidebarLogo(); renderNavCounts(); renderStats(); renderActiveTab();
     } catch (e) {
@@ -605,6 +611,7 @@
     document.getElementById('navCountClients').textContent = clients.length;
     document.getElementById('navCountOrders').textContent = orders.length;
     document.getElementById('navCountDocuments').textContent = documents.length;
+    document.getElementById('navCountCategories').textContent = categories.length;
     document.getElementById('navCountUsers').textContent = users.length;
   }
   function renderStats(){
@@ -618,6 +625,7 @@
 
   const TAB_META = {
     products: { title: 'Товары', sub: 'Каталог с артикулами, ценами и характеристиками', addLabel: 'Новый товар' },
+    categories: { title: 'Категории', sub: 'Список категорий товаров — можно пополнять', addLabel: 'Новая категория' },
     clients: { title: 'Клиенты', sub: 'База клиентов и история обращений', addLabel: 'Новый клиент' },
     orders: { title: 'Заказы', sub: 'Заявка → расчёт → КП → согласование → оплата → производство → отгрузка', addLabel: 'Новый заказ' },
     documents: { title: 'Документы', sub: 'КП, счета, накладные и договоры — печать в PDF', addLabel: 'Новый документ' },
@@ -637,14 +645,15 @@
       document.getElementById('addBtn').style.display = (activeTab === 'settings') ? 'none' : '';
       document.getElementById('importBtn').style.display = (activeTab === 'products' || activeTab === 'documents') ? '' : 'none';
       document.getElementById('importBtnLabel').textContent = activeTab === 'documents' ? 'Импорт КП из Excel' : 'Импорт прайса из Excel';
-      document.getElementById('statsRow').style.display = (activeTab === 'settings' || activeTab === 'users') ? 'none' : '';
-      ['products','clients','orders','documents','users','settings'].forEach(t => document.getElementById('tab-'+t).style.display = t === activeTab ? '' : 'none');
+      document.getElementById('statsRow').style.display = (activeTab === 'settings' || activeTab === 'users' || activeTab === 'categories') ? 'none' : '';
+      ['products','categories','clients','orders','documents','users','settings'].forEach(t => document.getElementById('tab-'+t).style.display = t === activeTab ? '' : 'none');
       renderActiveTab();
     });
   });
 
   function renderActiveTab(){
     if (activeTab === 'products') renderProducts();
+    if (activeTab === 'categories') renderCategories();
     if (activeTab === 'clients') renderClients();
     if (activeTab === 'orders') renderOrders();
     if (activeTab === 'documents') renderDocuments();
@@ -654,6 +663,7 @@
 
   document.getElementById('addBtn').addEventListener('click', () => {
     if (activeTab === 'products') openProductModal();
+    if (activeTab === 'categories') openCategoryModal();
     if (activeTab === 'clients') openClientModal();
     if (activeTab === 'orders') openOrderModal();
     if (activeTab === 'documents') openDocumentModal();
@@ -767,7 +777,11 @@
       </div>
       <div class="field-row">
         <div class="field"><label>Артикул</label><input id="f_sku" type="text" value="${escapeHtml(product?.sku||'')}" placeholder="USP-001"></div>
-        <div class="field"><label>Категория</label><select id="f_category">${CATEGORIES.map(c => `<option ${product?.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
+        <div class="field"><label>Категория</label><select id="f_category">
+          <option value=""${!product?.category?' selected':''}>— без категории —</option>
+          ${categories.map(c => `<option ${product?.category===c.name?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+          ${product?.category && !categories.some(c=>c.name===product.category) ? `<option selected>${escapeHtml(product.category)}</option>` : ''}
+        </select></div>
       </div>
       <div class="field"><label>Наименование</label><input id="f_name" type="text" value="${escapeHtml(product?.name||'')}" placeholder="Кроссовки для бега Air Runner"></div>
       <div class="field"><label>Цена, ₸</label><input id="f_price" type="number" min="0" value="${product?.price||''}" placeholder="32900"></div>
@@ -1258,6 +1272,56 @@
   }
 
   // ---------- Settings ----------
+  // ---------- Категории ----------
+  function renderCategories(){
+    const el = document.getElementById('tab-categories');
+    el.innerHTML = categories.length === 0 ? '<div class="panel"><div class="empty-state">Категорий пока нет. Добавьте первую через кнопку выше.</div></div>' : `
+      <div class="panel">
+        <table>
+          <thead><tr><th>Название</th><th>Товаров</th><th>Автор</th><th></th></tr></thead>
+          <tbody>
+            ${categories.map(c => `
+              <tr>
+                <td class="cell-name">${escapeHtml(c.name)}</td>
+                <td style="color:var(--ink-soft);">${products.filter(p => p.category === c.name).length}</td>
+                <td style="color:var(--ink-soft);font-size:12.5px;">${escapeHtml(c.createdByEmail||'—')}</td>
+                <td><div class="row-actions">
+                  <button class="btn-ghost-sm" data-edit-cat="${c.id}">Изменить</button>
+                  <button class="btn-danger-sm" data-del-cat="${c.id}">Удалить</button>
+                </div></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    el.querySelectorAll('[data-edit-cat]').forEach(b => b.addEventListener('click', () => openCategoryModal(categories.find(c => c.id === b.dataset.editCat))));
+    el.querySelectorAll('[data-del-cat]').forEach(b => b.addEventListener('click', async () => {
+      const inUse = products.filter(p => p.category === categories.find(c=>c.id===b.dataset.delCat)?.name).length;
+      const msg = inUse > 0 ? `Эту категорию используют ${inUse} товар(ов) — у них она просто станет текстом без категории. Удалить?` : 'Удалить категорию?';
+      if (!confirm(msg)) return;
+      try { await api('DELETE', '/categories/' + b.dataset.delCat); await loadAll(); }
+      catch(e) { alert(e.message || 'Не удалось удалить'); }
+    }));
+  }
+
+  function openCategoryModal(category){
+    const isEdit = !!category;
+    renderModal(`
+      <h3>${isEdit ? 'Изменить категорию' : 'Новая категория'}</h3>
+      <div class="field"><label>Название</label><input id="f_catname" type="text" value="${escapeHtml(category?.name||'')}" placeholder="Например, Тренажёры"></div>
+    `, async () => {
+      const name = document.getElementById('f_catname').value.trim();
+      if (!name) return alert('Укажите название категории');
+      try {
+        if (isEdit) await api('PUT', '/categories/' + category.id, { name });
+        else await api('POST', '/categories', { name });
+        await loadAll();
+        closeModal();
+      } catch(e) { alert(e.message || 'Не удалось сохранить'); }
+    });
+  }
+
   // ---------- Пользователи (только для admin) ----------
   const ROLE_LABELS = { manager: 'Менеджер', admin: 'Администратор' };
 
