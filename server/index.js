@@ -2,27 +2,37 @@ require('dotenv').config();
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 
 const productsRouter = require('./routes/products');
 const clientsRouter = require('./routes/clients');
 const ordersRouter = require('./routes/orders');
 const documentsRouter = require('./routes/documents');
 const settingsRouter = require('./routes/settings');
+const importRouter = require('./routes/import');
+const authRouter = require('./routes/auth');
+const requireAuth = require('./middleware/requireAuth');
 
 const app = express();
 
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+app.use(cookieParser());
 
-// Загруженные файлы (логотип и т.п.)
+// Загруженные файлы (логотип и т.п.) — доступны и без авторизации,
+// иначе не отрисуется логотип на странице входа
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// API
-app.use('/api/products', productsRouter);
-app.use('/api/clients', clientsRouter);
-app.use('/api/orders', ordersRouter);
-app.use('/api/documents', documentsRouter);
-app.use('/api/settings', settingsRouter);
+// Авторизация (без защиты — сюда и приходят за входом)
+app.use('/api/auth', authRouter);
+
+// Остальной API закрыт авторизацией
+app.use('/api/products', requireAuth, productsRouter);
+app.use('/api/clients', requireAuth, clientsRouter);
+app.use('/api/orders', requireAuth, ordersRouter);
+app.use('/api/documents', requireAuth, documentsRouter);
+app.use('/api/settings', requireAuth, settingsRouter);
+app.use('/api/import', requireAuth, importRouter);
 
 // Отдаём фронтенд как статику (index.html лежит в ../public)
 const frontendDir = path.join(__dirname, '..', 'public');

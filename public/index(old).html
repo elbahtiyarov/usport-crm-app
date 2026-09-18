@@ -174,8 +174,6 @@
 
   .items-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .items-toolbar select { flex: 1; min-width: 160px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--canvas); color: var(--ink); font-size: 13px; }
-  #catalogSearch:focus { outline: 2px solid var(--navy-dim); outline-offset: 1px; }
-  #catalogPick:focus { outline: 2px solid var(--navy-dim); outline-offset: 1px; }
   .items-rows { display: flex; flex-direction: column; gap: 6px; }
   .item-row { display: grid; grid-template-columns: 1fr 46px 84px 84px 20px; gap: 6px; align-items: center; }
   .item-row input { padding: 7px 8px; font-size: 13px; }
@@ -855,86 +853,31 @@
   function rerenderItemRows(){ document.getElementById('itemsRows').innerHTML = itemsRowsHtml(); bindItemsRows(); updateModalTotalDisplay(); }
   function updateModalTotalDisplay(){ const el = document.getElementById('modalTotal'); if (el) el.textContent = fmt(computeModalTotal()); }
 
-  function renderCatalogOptions(query = ''){
-    const q = String(query || '').trim().toLowerCase();
-    const list = q
-      ? products.filter(p =>
-          String(p.sku || '').toLowerCase().includes(q) ||
-          String(p.name || '').toLowerCase().includes(q)
-        )
-      : products;
-
-    if (!list.length) {
-      return '<option value="">Ничего не найдено</option>';
-    }
-
-    return '<option value="">— выбрать товар —</option>' +
-      list.map(p => `<option value="${p.id}">${p.sku ? escapeHtml(p.sku) + ' — ' : ''}${escapeHtml(p.name)} (${fmt(p.price)})</option>`).join('');
-  }
-
   function renderItemsBlock(){
     return `
       <div class="field">
         <label>Позиции</label>
-        <div style="display:flex;gap:8px;flex-direction:column;">
-          <input
-            type="text"
-            id="catalogSearch"
-            placeholder="Поиск по артикулу или наименованию..."
-            autocomplete="off"
-            style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:6px;background:var(--canvas);color:var(--ink);font-size:13.5px;"
-          >
-          <div class="items-toolbar">
-            <select id="catalogPick">
-              ${renderCatalogOptions()}
-            </select>
-            <button type="button" class="btn-ghost-sm" id="addFromCatalogBtn">Добавить</button>
-          </div>
-        </div>
-        <div id="catalogSearchHint" style="font-size:11.5px;color:var(--ink-soft);margin-top:6px;">
-          Введите артикул или часть названия товара
+        <div class="items-toolbar">
+          <select id="catalogPick">
+            <option value="">Товар из каталога…</option>
+            ${products.map(p => `<option value="${p.id}">${p.sku?escapeHtml(p.sku)+' — ':''}${escapeHtml(p.name)} (${fmt(p.price)})</option>`).join('')}
+          </select>
+          <button type="button" class="btn-ghost-sm" id="addFromCatalogBtn">Добавить</button>
+          <button type="button" class="btn-ghost-sm" id="addManualBtn">+ Вручную</button>
         </div>
         <div id="itemsRows" class="items-rows" style="margin-top:10px;">${itemsRowsHtml()}</div>
       </div>
     `;
   }
-
   function bindItemsBlock(){
     bindItemsRows();
-
-    const searchInput = document.getElementById('catalogSearch');
-    const catalogPick = document.getElementById('catalogPick');
-
-    searchInput.addEventListener('input', e => {
-      const query = e.target.value;
-      const currentValue = catalogPick.value;
-      catalogPick.innerHTML = renderCatalogOptions(query);
-
-      // Сохраняем выбранный товар, если он всё ещё подходит под поиск.
-      const stillVisible = Array.from(catalogPick.options).some(o => o.value === currentValue);
-      if (stillVisible) catalogPick.value = currentValue;
-
-      const count = catalogPick.options.length - (catalogPick.options[0]?.value ? 0 : 1);
-      const hint = document.getElementById('catalogSearchHint');
-      if (query.trim()) {
-        hint.textContent = count ? `Найдено товаров: ${count}` : 'По вашему запросу ничего не найдено';
-      } else {
-        hint.textContent = 'Введите артикул или часть названия товара';
-      }
-    });
-
+    document.getElementById('addManualBtn').addEventListener('click', () => { modalItems.push({ name: '', qty: 1, price: 0 }); rerenderItemRows(); });
     document.getElementById('addFromCatalogBtn').addEventListener('click', () => {
-      const pid = catalogPick.value;
+      const pid = document.getElementById('catalogPick').value;
       const p = products.find(x => x.id === pid);
-      if (!p) {
-        searchInput.focus();
-        return;
-      }
+      if (!p) return;
       modalItems.push({ name: p.name, qty: 1, price: p.price, sku: p.sku||'' });
       rerenderItemRows();
-      searchInput.value = '';
-      catalogPick.innerHTML = renderCatalogOptions();
-      searchInput.focus();
     });
   }
 

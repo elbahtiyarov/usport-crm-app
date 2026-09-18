@@ -85,3 +85,33 @@ CREATE INDEX IF NOT EXISTS idx_orders_stage ON orders(stage);
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(doc_type);
 CREATE INDEX IF NOT EXISTS idx_document_items_doc ON document_items(document_id);
+
+-- Авторизация: вход по коду на почту (без паролей)
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  name TEXT,
+  role TEXT NOT NULL DEFAULT 'manager', -- manager | admin
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_login_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS auth_codes (
+  id SERIAL PRIMARY KEY,
+  email TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  used BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_auth_codes_email ON auth_codes(email);
+
+-- Владелец записи: кто создал клиента/заказ/документ.
+-- ON DELETE SET NULL — если пользователя удалят, его старые записи не
+-- пропадают, просто становятся "ничьими" (редактировать сможет любой).
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+
