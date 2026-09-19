@@ -13,12 +13,15 @@ function mapOrder(r) {
     items: Array.isArray(r.items) ? r.items : [],
     createdAt: new Date(r.created_at).getTime(),
     createdBy: r.created_by != null ? String(r.created_by) : null,
-    createdByEmail: r.created_by_email || null
+    createdByEmail: r.created_by_email || null,
+    approvedBy: r.approved_by != null ? String(r.approved_by) : null,
+    approvedByEmail: r.approved_by_email || null,
+    approvedAt: r.approved_at ? new Date(r.approved_at).getTime() : null
   };
 }
 
 const LIST_QUERY = `
-  SELECT o.*, u.email AS created_by_email, COALESCE(
+  SELECT o.*, u.email AS created_by_email, au.email AS approved_by_email, COALESCE(
     json_agg(
       json_build_object('id', oi.id, 'sku', oi.sku, 'name', oi.name, 'qty', oi.qty, 'price', oi.price, 'photoUrl', oi.photo_url)
       ORDER BY oi.id
@@ -27,8 +30,16 @@ const LIST_QUERY = `
   FROM orders o
   LEFT JOIN order_items oi ON oi.order_id = o.id
   LEFT JOIN users u ON u.id = o.created_by
+  LEFT JOIN users au ON au.id = o.approved_by
 `;
-const GROUP_BY = 'GROUP BY o.id, u.email';
+const GROUP_BY = 'GROUP BY o.id, u.email, au.email';
+
+// Единственный переход, требующий подтверждения администратором —
+// с этапа "Согласование" на "Оплата". Всё остальное (включая отправку
+// назад на доработку) менеджер, владеющий заказом, делает сам.
+function isApprovalStep(fromStage, toStage) {
+  return fromStage === 'approval' && toStage === 'payment';
+}
 
 router.get('/', async (req, res, next) => {
   try {
@@ -73,14 +84,28 @@ router.put('/:id', async (req, res, next) => {
   const denial = await assertOwnership(pool, 'orders', req.params.id, req);
   if (denial) return res.status(denial.status).json({ error: denial.error });
 
+  const { rows: currentRows } = await pool.query('SELECT stage FROM orders WHERE id=$1', [req.params.id]);
+  if (!currentRows[0]) return res.status(404).json({ error: 'Заказ не найден' });
+  const currentStage = currentRows[0].stage;
+  const nextStage = req.body.stage || 'request';
+  if (isApprovalStep(currentStage, nextStage) && req.userRole !== 'admin') {
+    return res.status(403).json({ error: 'Перевести заказ с «Согласования» на «Оплату» может только администратор' });
+  }
+
   const client = await pool.connect();
   try {
-    const { clientId, clientName, items = [], stage } = req.body;
+    const { clientId, clientName, items = [] } = req.body;
     const amount = items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.price) || 0), 0);
+    const approve = isApprovalStep(currentStage, nextStage);
+    const resetApproval = nextStage === 'approval' && currentStage !== 'approval';
+
     await client.query('BEGIN');
     const { rows } = await client.query(
-      `UPDATE orders SET client_id=$1, client_name=$2, stage=$3, amount=$4 WHERE id=$5 RETURNING *`,
-      [clientId || null, clientName || null, stage || 'request', amount, req.params.id]
+      `UPDATE orders SET client_id=$1, client_name=$2, stage=$3, amount=$4,
+         approved_by = CASE WHEN $6 THEN $7 WHEN $8 THEN NULL ELSE approved_by END,
+         approved_at = CASE WHEN $6 THEN now() WHEN $8 THEN NULL ELSE approved_at END
+       WHERE id=$5 RETURNING *`,
+      [clientId || null, clientName || null, nextStage, amount, req.params.id, approve, req.userId, resetApproval]
     );
     if (!rows[0]) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Заказ не найден' }); }
     await client.query('DELETE FROM order_items WHERE order_id=$1', [req.params.id]);
@@ -102,8 +127,25 @@ router.patch('/:id/stage', async (req, res, next) => {
     const denial = await assertOwnership(pool, 'orders', req.params.id, req);
     if (denial) return res.status(denial.status).json({ error: denial.error });
 
+    const { rows: currentRows } = await pool.query('SELECT stage FROM orders WHERE id=$1', [req.params.id]);
+    if (!currentRows[0]) return res.status(404).json({ error: 'Заказ не найден' });
+    const currentStage = currentRows[0].stage;
     const { stage } = req.body;
-    const { rows } = await pool.query(`UPDATE orders SET stage=$1 WHERE id=$2 RETURNING *`, [stage, req.params.id]);
+
+    if (isApprovalStep(currentStage, stage) && req.userRole !== 'admin') {
+      return res.status(403).json({ error: 'Перевести заказ с «Согласования» на «Оплату» может только администратор' });
+    }
+
+    const approve = isApprovalStep(currentStage, stage);
+    const resetApproval = stage === 'approval' && currentStage !== 'approval';
+
+    const { rows } = await pool.query(
+      `UPDATE orders SET stage=$1,
+         approved_by = CASE WHEN $3 THEN $4 WHEN $5 THEN NULL ELSE approved_by END,
+         approved_at = CASE WHEN $3 THEN now() WHEN $5 THEN NULL ELSE approved_at END
+       WHERE id=$2 RETURNING *`,
+      [stage, req.params.id, approve, req.userId, resetApproval]
+    );
     if (!rows[0]) return res.status(404).json({ error: 'Заказ не найден' });
     const { rows: full } = await pool.query(`${LIST_QUERY} WHERE o.id=$1 ${GROUP_BY}`, [req.params.id]);
     res.json(mapOrder(full[0]));

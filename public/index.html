@@ -153,9 +153,15 @@
   .deal-card .dc-items { font-size: 12px; color: var(--ink-soft); margin-bottom: 8px; line-height: 1.4; }
   .deal-card .dc-amount { font-family: 'Barlow Condensed', sans-serif; font-size: 19px; font-weight: 700; margin-bottom: 10px; }
   .dc-actions { display: flex; flex-direction: column; gap: 8px; }
-  .dc-move { display: flex; gap: 4px; }
+  .dc-move { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
   .dc-move button { width: 24px; height: 24px; border: 1px solid var(--line); background: var(--paper); border-radius: 4px; font-size: 13px; color: var(--ink-soft); }
   .dc-move button:hover { border-color: var(--navy-dim); color: var(--navy-dim); }
+  .dc-move button.dc-approve-btn {
+    width: auto; padding: 0 10px; font-size: 11.5px; font-weight: 700;
+    background: var(--green); color: #fff; border-color: var(--green);
+  }
+  .dc-move button.dc-approve-btn:hover { background: #17612f; border-color: #17612f; color: #fff; }
+  .dc-wait { font-size: 10.5px; color: var(--amber); font-weight: 600; line-height: 1.3; }
   .dc-move button:disabled { opacity: 0.3; cursor: default; }
   .dc-bottom { display: flex; justify-content: space-between; align-items: center; }
   .kanban-empty { font-size: 12px; color: var(--ink-soft); text-align: center; padding: 14px 0; }
@@ -187,6 +193,79 @@
   .it-remove { background: none; border: none; color: var(--ink-soft); font-size: 15px; line-height: 1; padding: 4px; }
   .it-remove:hover { color: var(--red); }
   .kp-total-row { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; margin-top: 4px; border-top: 1px solid var(--line); font-weight: 700; }
+
+  /* ---------- Сообщения ---------- */
+  .messages-layout { display: flex; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; height: calc(100vh - 220px); min-height: 420px; }
+  .messages-list { width: 280px; flex-shrink: 0; border-right: 1px solid var(--line); overflow-y: auto; }
+  .messages-list-item { padding: 12px 16px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .messages-list-item:hover { background: var(--canvas); }
+  .messages-list-item.active { background: var(--navy-pale); }
+  .ml-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .ml-name { font-weight: 600; font-size: 14px; }
+  .ml-preview { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ml-badge { background: var(--red); color: #fff; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; }
+  .messages-thread { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .messages-thread-head { padding: 14px 18px; border-bottom: 1px solid var(--line); font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 10px; }
+  .mt-back { display: none; background: none; border: none; color: var(--ink-soft); font-size: 18px; padding: 2px 4px; }
+  .messages-thread-body { flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .msg-bubble-row { display: flex; align-items: flex-end; gap: 6px; max-width: 78%; }
+  .msg-bubble-row.mine { align-self: flex-end; flex-direction: row-reverse; }
+  .msg-bubble-row.theirs { align-self: flex-start; }
+  .msg-reply-btn {
+    background: var(--chip); border: none; border-radius: 50%; width: 24px; height: 24px;
+    color: var(--ink-soft); font-size: 12px; flex-shrink: 0; opacity: 0; transition: opacity 0.12s ease;
+  }
+  .msg-bubble-row:hover .msg-reply-btn { opacity: 1; }
+  .msg-reply-btn:hover { background: var(--navy-pale); color: var(--navy-dim); }
+  .msg-bubble { max-width: 100%; padding: 9px 13px; border-radius: 12px; font-size: 14px; line-height: 1.4; word-break: break-word; }
+  .msg-bubble.mine { background: var(--navy); color: #fff; border-bottom-right-radius: 3px; }
+  .msg-bubble.theirs { background: var(--chip); color: var(--ink); border-bottom-left-radius: 3px; }
+  .msg-time { font-size: 10.5px; opacity: 0.7; margin-top: 4px; display: block; }
+  .msg-quote { border-left: 3px solid rgba(255,255,255,0.4); padding: 4px 8px; margin-bottom: 6px; border-radius: 4px; background: rgba(255,255,255,0.1); font-size: 12px; }
+  .msg-bubble.theirs .msg-quote { border-left-color: var(--navy-dim); background: rgba(20,41,77,0.06); }
+  .msg-quote-who { font-weight: 700; opacity: 0.85; }
+  .msg-quote-text { opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
+  .messages-thread-input { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); align-items: flex-end; }
+  .messages-thread-input textarea { flex: 1; resize: none; border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font-size: 14px; font-family: inherit; background: var(--canvas); color: var(--ink); max-height: 100px; }
+  .mt-attach-btn {
+    background: var(--red-pale); border: 1px solid transparent; border-radius: 50%;
+    width: 38px; height: 38px; flex-shrink: 0;
+    color: var(--red); display: flex; align-items: center; justify-content: center;
+  }
+  .mt-attach-btn svg { width: 18px; height: 18px; }
+  .mt-attach-btn:hover { background: var(--red); color: #fff; }
+  .mt-popover {
+    position: absolute; bottom: 58px; left: 16px; background: var(--paper); border: 1px solid var(--line);
+    border-radius: 10px; box-shadow: 0 -8px 28px -8px rgba(0,0,0,0.25); padding: 10px; z-index: 30;
+  }
+  .emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; width: 260px; max-height: 220px; overflow-y: auto; }
+  .emoji-btn { background: none; border: none; font-size: 19px; padding: 5px; border-radius: 6px; line-height: 1; }
+  .emoji-btn:hover { background: var(--chip); }
+  .mt-gif-popover { width: 260px; }
+  .gif-search { width: 100%; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--canvas); color: var(--ink); font-size: 13px; margin-bottom: 8px; }
+  .gif-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; max-height: 260px; overflow-y: auto; }
+  .gif-thumb { width: 100%; height: 90px; object-fit: cover; border-radius: 6px; cursor: pointer; display: block; }
+  .gif-thumb:hover { outline: 2px solid var(--red); }
+  .gif-loading { grid-column: 1 / -1; text-align: center; color: var(--ink-soft); font-size: 12.5px; padding: 20px 0; }
+  #replyPreview {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 8px 16px; background: var(--navy-pale); border-top: 1px solid var(--line); border-left: 3px solid var(--navy-dim);
+  }
+  .reply-preview-who { font-size: 11.5px; font-weight: 700; color: var(--navy-dim); }
+  .reply-preview-body { font-size: 12.5px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
+  #replyPreview button { background: none; border: none; color: var(--red); font-size: 14px; padding: 2px 6px; flex-shrink: 0; }
+  #attachmentPreview { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 16px; background: var(--chip); border-top: 1px solid var(--line); font-size: 12.5px; }
+  #attachmentPreview button { background: none; border: none; color: var(--red); font-size: 14px; padding: 2px 6px; }
+  .msg-attachment-img { max-width: 220px; max-height: 220px; border-radius: 8px; display: block; margin-bottom: 4px; cursor: pointer; }
+  .msg-attachment-file { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.15); color: inherit; text-decoration: none; font-size: 13px; margin-bottom: 4px; }
+  .msg-bubble.theirs .msg-attachment-file { background: rgba(20,41,77,0.08); }
+  .messages-empty-thread { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--ink-soft); font-size: 14px; text-align: center; padding: 20px; }
+  @media (max-width: 760px) {
+    .messages-layout { height: calc(100vh - 260px); }
+    .messages-layout.thread-open .messages-list { display: none; }
+    .messages-layout:not(.thread-open) .messages-thread { display: none; }
+    .mt-back { display: inline-block; }
+  }
 
   .settings-panel { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 24px; max-width: 640px; }
   .settings-panel h3 { margin: 0 0 4px; font-size: 17px; }
@@ -377,6 +456,10 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14H6V3z"/><path d="M15 3v4h4"/><path d="M9 12h6M9 16h6"/></svg>
     Документы <span class="nav-count" id="navCountDocuments">0</span>
   </button>
+  <button class="nav-item" data-tab="messages">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+    Сообщения <span class="nav-count" id="navCountMessages">0</span>
+  </button>
   <div class="nav-spacer"></div>
   <button class="nav-item" data-tab="users" id="usersNavItem" style="display:none;">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -431,6 +514,7 @@
     <div id="tab-orders" style="display:none"></div>
     <div id="tab-documents" style="display:none"></div>
     <div id="tab-users" style="display:none"></div>
+    <div id="tab-messages" style="display:none"></div>
     <div id="tab-settings" style="display:none"></div>
   </div>
 </main>
@@ -481,6 +565,8 @@
 
   let activeTab = 'products';
   let products = [], clients = [], orders = [], documents = [], users = [], categories = [], settings = { name: 'USPORT' };
+  let conversations = [], activeMessageUserId = null, messageThread = [];
+  let messagesPollTimer = null, unreadPollTimer = null;
   let productSearch = '', clientSearch = '';
   let modalItems = [];
   let currentUser = null;
@@ -505,6 +591,7 @@
     document.getElementById('appShell').style.display = 'flex';
     document.getElementById('usersNavItem').style.display = (currentUser && currentUser.role === 'admin') ? '' : 'none';
     renderUserFooter();
+    startUnreadPolling();
   }
   function showLogin(){
     document.getElementById('loginScreen').style.display = 'flex';
@@ -523,9 +610,39 @@
   async function doLogout(){
     await fetch('/api/auth/logout', { method: 'POST' });
     currentUser = null;
+    stopUnreadPolling();
+    stopMessagesPolling();
     showLogin();
   }
   document.getElementById('logoutIconBtn').addEventListener('click', doLogout);
+
+  function startUnreadPolling(){
+    stopUnreadPolling();
+    refreshUnreadBadge();
+    unreadPollTimer = setInterval(refreshUnreadBadge, 20000);
+  }
+  function stopUnreadPolling(){ if (unreadPollTimer) { clearInterval(unreadPollTimer); unreadPollTimer = null; } }
+  async function refreshUnreadBadge(){
+    if (!currentUser) return;
+    try {
+      const data = await api('GET', '/messages/unread-count');
+      document.getElementById('navCountMessages').textContent = data.count;
+    } catch(e) { /* тихо игнорируем — не критично */ }
+  }
+  function startMessagesPolling(){
+    stopMessagesPolling();
+    messagesPollTimer = setInterval(refreshActiveConversation, 4000);
+  }
+  function stopMessagesPolling(){ if (messagesPollTimer) { clearInterval(messagesPollTimer); messagesPollTimer = null; } }
+  async function refreshActiveConversation(){
+    if (activeTab !== 'messages') return;
+    try {
+      conversations = await api('GET', '/messages/conversations');
+      if (activeMessageUserId) messageThread = await api('GET', '/messages/' + activeMessageUserId);
+      updateMessagesContent();
+      refreshUnreadBadge();
+    } catch(e) { /* тихо игнорируем при фоновом опросе */ }
+  }
 
   async function checkAuth(){
     try {
@@ -630,6 +747,7 @@
     orders: { title: 'Заказы', sub: 'Заявка → расчёт → КП → согласование → оплата → производство → отгрузка', addLabel: 'Новый заказ' },
     documents: { title: 'Документы', sub: 'КП, счета, накладные и договоры — печать в PDF', addLabel: 'Новый документ' },
     users: { title: 'Пользователи', sub: 'Кто может входить в систему и с какой ролью', addLabel: 'Новый пользователь' },
+    messages: { title: 'Сообщения', sub: 'Личная переписка с коллегами', addLabel: '' },
     settings: { title: 'Настройки', sub: 'Реквизиты компании и логотип для документов', addLabel: '' }
   };
 
@@ -642,12 +760,13 @@
       document.getElementById('pageTitle').textContent = meta.title;
       document.getElementById('pageSub').textContent = meta.sub;
       document.getElementById('addBtnLabel').textContent = meta.addLabel;
-      document.getElementById('addBtn').style.display = (activeTab === 'settings') ? 'none' : '';
+      document.getElementById('addBtn').style.display = (activeTab === 'settings' || activeTab === 'messages') ? 'none' : '';
       document.getElementById('importBtn').style.display = (activeTab === 'products' || activeTab === 'documents') ? '' : 'none';
       document.getElementById('importBtnLabel').textContent = activeTab === 'documents' ? 'Импорт КП из Excel' : 'Импорт прайса из Excel';
-      document.getElementById('statsRow').style.display = (activeTab === 'settings' || activeTab === 'users' || activeTab === 'categories') ? 'none' : '';
-      ['products','categories','clients','orders','documents','users','settings'].forEach(t => document.getElementById('tab-'+t).style.display = t === activeTab ? '' : 'none');
+      document.getElementById('statsRow').style.display = (activeTab === 'settings' || activeTab === 'users' || activeTab === 'categories' || activeTab === 'messages') ? 'none' : '';
+      ['products','categories','clients','orders','documents','users','messages','settings'].forEach(t => document.getElementById('tab-'+t).style.display = t === activeTab ? '' : 'none');
       renderActiveTab();
+      if (activeTab === 'messages') startMessagesPolling(); else stopMessagesPolling();
     });
   });
 
@@ -658,6 +777,7 @@
     if (activeTab === 'orders') renderOrders();
     if (activeTab === 'documents') renderDocuments();
     if (activeTab === 'users') renderUsers();
+    if (activeTab === 'messages') renderMessagesTab();
     if (activeTab === 'settings') renderSettings();
   }
 
@@ -1013,12 +1133,15 @@
             <div class="dc-client">${escapeHtml(o.clientName||'Без клиента')}</div>
             <div class="dc-items">${(o.items||[]).slice(0,2).map(it => escapeHtml(it.name)).join(', ')}${(o.items||[]).length>2 ? ` и ещё ${o.items.length-2}` : ''}</div>
             ${o.createdByEmail ? `<div class="dc-items" style="opacity:0.75;">${escapeHtml(o.createdByEmail)}</div>` : ''}
+            ${o.approvedByEmail ? `<div class="dc-items" style="opacity:0.75;color:var(--green);">✓ Подтвердил: ${escapeHtml(o.approvedByEmail)}</div>` : ''}
             <div class="dc-amount">${fmt(o.amount)}</div>
             <div class="dc-actions">
               ${canEdit(o) ? `
                 <div class="dc-move">
                   <button data-move="${o.id}" data-dir="-1" ${si===0?'disabled':''} title="Назад">‹</button>
-                  <button data-move="${o.id}" data-dir="1" ${si===STAGES.length-1?'disabled':''} title="Вперёд">›</button>
+                  ${stage.id === 'approval' && (!currentUser || currentUser.role !== 'admin')
+                    ? `<span class="dc-wait">Ждёт подтверждения администратора</span>`
+                    : `<button data-move="${o.id}" data-dir="1" ${si===STAGES.length-1?'disabled':''} title="${stage.id==='approval'?'Подтвердить и перевести на оплату':'Вперёд'}" class="${stage.id==='approval'?'dc-approve-btn':''}">${stage.id==='approval'?'✓ Подтвердить':'›'}</button>`}
                   <button class="btn-ghost-sm" data-edit="${o.id}" style="padding:4px 7px;">Изменить</button>
                 </div>
                 <div class="dc-bottom">
@@ -1320,6 +1443,316 @@
         closeModal();
       } catch(e) { alert(e.message || 'Не удалось сохранить'); }
     });
+  }
+
+  // ---------- Сообщения ----------
+  let pendingAttachment = null;
+  let replyingTo = null;
+
+  const EMOJIS = ['😀','😁','😂','🤣','😊','😍','😘','😉','😎','🤩','🥳','😇','🙂','🙃','😅','😆',
+    '🤔','🤨','😐','😴','🥱','😭','😢','😡','🤬','😱','😨','🥺','😳','🤗','🤝','👍',
+    '👎','👏','🙌','🙏','💪','✌️','🤞','👌','🔥','✨','🎉','🎊','💯','❤️','🧡','💛',
+    '💚','💙','💜','🖤','🤍','💔','⭐','🌟','☀️','🌙','⚡','☕','🍕','🍔','🍺','🎁'];
+
+  function fmtTime(ts){
+    const d = new Date(ts);
+    const today = new Date();
+    const sameDay = d.toDateString() === today.toDateString();
+    return sameDay ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+                   : d.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function attachmentHtml(m){
+    if (!m.attachmentUrl) return '';
+    const isImage = (m.attachmentType||'').startsWith('image/');
+    if (isImage) {
+      return `<a href="${m.attachmentUrl}" target="_blank" rel="noopener"><img src="${m.attachmentUrl}" class="msg-attachment-img" alt=""></a>`;
+    }
+    return `<a href="${m.attachmentUrl}" target="_blank" rel="noopener" class="msg-attachment-file">📎 ${escapeHtml(m.attachmentName||'Файл')}</a>`;
+  }
+
+  function quotedPreviewText(m){
+    if (!m) return 'Сообщение';
+    if (m.body) return m.body;
+    if (m.attachmentType === 'image/gif') return '🎞 GIF';
+    if ((m.attachmentType||'').startsWith('image/')) return '📷 Фото';
+    if (m.attachmentUrl) return '📎 ' + (m.attachmentName || 'Файл');
+    return 'Сообщение';
+  }
+
+  function replyQuoteHtml(m){
+    if (!m.replyToId) return '';
+    const original = messageThread.find(x => x.id === m.replyToId);
+    const who = original ? (String(original.senderId)===String(currentUser.id) ? 'Вы' : (conversations.find(c=>c.id===activeMessageUserId)?.login || 'Собеседник')) : '';
+    return `<div class="msg-quote">${who ? `<div class="msg-quote-who">${escapeHtml(who)}</div>` : ''}<div class="msg-quote-text">${escapeHtml(quotedPreviewText(original))}</div></div>`;
+  }
+
+  function messagesListHtml(){
+    return conversations.length === 0 ? '<div class="empty-state">Пока не с кем переписываться — как появятся другие пользователи, они будут здесь.</div>' : conversations.map(c => `
+      <div class="messages-list-item ${c.id===activeMessageUserId?'active':''}" data-open-thread="${c.id}">
+        <div class="ml-row">
+          <div class="ml-name">${escapeHtml(c.login)}</div>
+          ${c.unread > 0 ? `<span class="ml-badge">${c.unread}</span>` : ''}
+        </div>
+        <div class="ml-preview">${c.lastBody ? (c.lastFromMe?'Вы: ':'') + escapeHtml(c.lastBody) : 'Нет сообщений'}</div>
+      </div>
+    `).join('');
+  }
+
+  function messagesBubblesHtml(){
+    return messageThread.map(m => `
+      <div class="msg-bubble-row ${String(m.senderId)===String(currentUser.id)?'mine':'theirs'}">
+        <button type="button" class="msg-reply-btn" data-reply-id="${m.id}" title="Ответить">↩</button>
+        <div class="msg-bubble ${String(m.senderId)===String(currentUser.id)?'mine':'theirs'}">
+          ${replyQuoteHtml(m)}
+          ${attachmentHtml(m)}
+          ${m.body ? escapeHtml(m.body) : ''}
+          <span class="msg-time">${fmtTime(m.createdAt)}</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Полная пересборка — только при открытии вкладки или смене собеседника.
+  // Поле ввода создаётся здесь один раз и больше не пересоздаётся,
+  // иначе при каждом фоновом обновлении слетал бы фокус во время печати.
+  async function renderMessagesTab(){
+    const el = document.getElementById('tab-messages');
+    try { conversations = await api('GET', '/messages/conversations'); }
+    catch(e) { el.innerHTML = '<div class="empty-state">Не удалось загрузить список.</div>'; return; }
+
+    const activeConv = conversations.find(c => c.id === activeMessageUserId);
+    const threadHtml = !activeMessageUserId ? `<div class="messages-empty-thread">Выберите собеседника слева, чтобы начать переписку</div>` : `
+      <div class="messages-thread-head">
+        <button class="mt-back" id="msgBackBtn">←</button>
+        <span>${escapeHtml(activeConv ? activeConv.login : '')}</span>
+      </div>
+      <div class="messages-thread-body" id="messagesThreadBody">${messagesBubblesHtml()}</div>
+      <div id="replyPreview" style="display:none;"></div>
+      <div id="attachmentPreview" style="display:none;"></div>
+      <div class="messages-thread-input" style="position:relative;">
+        <button type="button" class="mt-attach-btn" id="emojiBtn" title="Эмодзи">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01"/></svg>
+        </button>
+        <div id="emojiPanel" class="mt-popover" style="display:none;"></div>
+
+        <button type="button" class="mt-attach-btn" id="gifBtn" title="GIF">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9v6M11 9v6M11 12h2M16 9v6M16 12h2"/></svg>
+        </button>
+        <div id="gifPanel" class="mt-popover mt-gif-popover" style="display:none;"></div>
+
+        <button type="button" class="mt-attach-btn" id="attachBtn" title="Прикрепить файл">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.67 3.67 0 0 1 5.19 5.19l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.59l8.49-8.48"/></svg>
+        </button>
+        <input type="file" id="attachmentInput" style="display:none;">
+        <textarea id="messageInput" rows="1" placeholder="Написать сообщение…"></textarea>
+        <button class="btn-primary" id="sendMessageBtn" style="border-radius:8px;">Отправить</button>
+      </div>
+    `;
+
+    el.innerHTML = `
+      <div class="messages-layout ${activeMessageUserId?'thread-open':''}">
+        <div class="messages-list" id="messagesListWrap">${messagesListHtml()}</div>
+        <div class="messages-thread">${threadHtml}</div>
+      </div>
+    `;
+    bindMessagesListClicks();
+
+    const backBtn = document.getElementById('msgBackBtn');
+    if (backBtn) backBtn.addEventListener('click', () => { activeMessageUserId = null; messageThread = []; pendingAttachment = null; replyingTo = null; renderMessagesTab(); });
+
+    const threadBodyEl = document.getElementById('messagesThreadBody');
+    if (threadBodyEl) threadBodyEl.addEventListener('click', e => {
+      const btn = e.target.closest('[data-reply-id]');
+      if (!btn) return;
+      const original = messageThread.find(m => m.id === btn.dataset.replyId);
+      if (original) { replyingTo = original; renderReplyPreview(); document.getElementById('messageInput').focus(); }
+    });
+
+    const sendBtn = document.getElementById('sendMessageBtn');
+    if (sendBtn) {
+      sendBtn.addEventListener('click', sendChatMessage);
+      const input = document.getElementById('messageInput');
+      input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } });
+      input.focus();
+
+      document.getElementById('attachBtn').addEventListener('click', () => { closePopovers(); document.getElementById('attachmentInput').click(); });
+      document.getElementById('attachmentInput').addEventListener('change', e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 10 * 1024 * 1024) { alert('Файл больше 10 МБ — выберите другой.'); e.target.value = ''; return; }
+        pendingAttachment = file;
+        renderAttachmentPreview();
+      });
+
+      document.getElementById('emojiBtn').addEventListener('click', toggleEmojiPanel);
+      document.getElementById('gifBtn').addEventListener('click', toggleGifPanel);
+    }
+
+    scrollThreadToBottom();
+    document.getElementById('navCountMessages').textContent = conversations.reduce((s,c) => s + (c.unread||0), 0);
+  }
+
+  function bindMessagesListClicks(){
+    document.querySelectorAll('[data-open-thread]').forEach(item => item.addEventListener('click', () => openMessageThread(item.dataset.openThread)));
+  }
+
+  function closePopovers(){
+    const ep = document.getElementById('emojiPanel'); if (ep) ep.style.display = 'none';
+    const gp = document.getElementById('gifPanel'); if (gp) gp.style.display = 'none';
+  }
+
+  function toggleEmojiPanel(){
+    const panel = document.getElementById('emojiPanel');
+    const gifPanel = document.getElementById('gifPanel');
+    if (gifPanel) gifPanel.style.display = 'none';
+    if (!panel) return;
+    if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
+    panel.innerHTML = `<div class="emoji-grid">${EMOJIS.map(em => `<button type="button" class="emoji-btn" data-emoji="${em}">${em}</button>`).join('')}</div>`;
+    panel.querySelectorAll('.emoji-btn').forEach(b => b.addEventListener('click', () => insertEmoji(b.dataset.emoji)));
+    panel.style.display = 'block';
+  }
+
+  function insertEmoji(emoji){
+    const input = document.getElementById('messageInput');
+    const start = input.selectionStart, end = input.selectionEnd;
+    input.value = input.value.slice(0, start) + emoji + input.value.slice(end);
+    const pos = start + emoji.length;
+    input.focus();
+    input.setSelectionRange(pos, pos);
+  }
+
+  function toggleGifPanel(){
+    const panel = document.getElementById('gifPanel');
+    const emojiPanel = document.getElementById('emojiPanel');
+    if (emojiPanel) emojiPanel.style.display = 'none';
+    if (!panel) return;
+    if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+    panel.innerHTML = `
+      <input type="text" id="gifSearchInput" placeholder="Поиск гифок…" class="gif-search">
+      <div class="gif-grid" id="gifGrid"><div class="gif-loading">Загрузка…</div></div>
+    `;
+    let searchTimer = null;
+    document.getElementById('gifSearchInput').addEventListener('input', e => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => loadGifs(e.target.value.trim()), 350);
+    });
+    loadGifs('');
+  }
+
+  async function loadGifs(query){
+    const grid = document.getElementById('gifGrid');
+    if (!grid) return;
+    grid.innerHTML = '<div class="gif-loading">Загрузка…</div>';
+    try {
+      const gifs = await api('GET', '/messages/gifs' + (query ? '?q=' + encodeURIComponent(query) : ''));
+      if (!gifs.length) { grid.innerHTML = '<div class="gif-loading">Ничего не нашлось</div>'; return; }
+      grid.innerHTML = gifs.map(g => `<img src="${g.previewUrl}" data-gif-url="${g.url}" class="gif-thumb" alt="">`).join('');
+      grid.querySelectorAll('.gif-thumb').forEach(img => img.addEventListener('click', () => sendGifMessage(img.dataset.gifUrl)));
+    } catch(e) { grid.innerHTML = '<div class="gif-loading">Не удалось загрузить гифки</div>'; }
+  }
+
+  async function sendGifMessage(url){
+    if (!activeMessageUserId) return;
+    closePopovers();
+    const replyToId = replyingTo ? replyingTo.id : '';
+    replyingTo = null; renderReplyPreview();
+    try {
+      const formData = new FormData();
+      formData.append('recipientId', activeMessageUserId);
+      formData.append('body', '');
+      formData.append('externalAttachmentUrl', url);
+      formData.append('externalAttachmentType', 'image/gif');
+      formData.append('externalAttachmentName', 'gif');
+      if (replyToId) formData.append('replyToId', replyToId);
+      const res = await fetch('/api/messages', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error((await res.json().catch(()=>({}))).error || 'Не удалось отправить гифку');
+      messageThread = await api('GET', '/messages/' + activeMessageUserId);
+      conversations = await api('GET', '/messages/conversations');
+      updateMessagesContent();
+    } catch(e) { alert(e.message || 'Не удалось отправить гифку'); }
+  }
+
+  function renderAttachmentPreview(){
+    const el = document.getElementById('attachmentPreview');
+    if (!el) return;
+    if (!pendingAttachment) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = 'flex';
+    el.innerHTML = `<span>📎 ${escapeHtml(pendingAttachment.name)}</span><button type="button" id="removeAttachmentBtn">✕</button>`;
+    document.getElementById('removeAttachmentBtn').addEventListener('click', () => {
+      pendingAttachment = null;
+      document.getElementById('attachmentInput').value = '';
+      renderAttachmentPreview();
+    });
+  }
+
+  function renderReplyPreview(){
+    const el = document.getElementById('replyPreview');
+    if (!el) return;
+    if (!replyingTo) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    const who = String(replyingTo.senderId)===String(currentUser.id) ? 'себе' : (conversations.find(c=>c.id===activeMessageUserId)?.login || 'собеседнику');
+    el.style.display = 'flex';
+    el.innerHTML = `<div class="reply-preview-text"><div class="reply-preview-who">Ответ ${escapeHtml(who)}</div><div class="reply-preview-body">${escapeHtml(quotedPreviewText(replyingTo))}</div></div><button type="button" id="cancelReplyBtn">✕</button>`;
+    document.getElementById('cancelReplyBtn').addEventListener('click', () => { replyingTo = null; renderReplyPreview(); });
+  }
+
+  function scrollThreadToBottom(){
+    const body = document.getElementById('messagesThreadBody');
+    if (body) body.scrollTop = body.scrollHeight;
+  }
+
+  // Лёгкое обновление содержимого (список + переписка) — используется при
+  // фоновом опросе и сразу после отправки. НЕ трогает textarea/кнопки,
+  // чтобы не сбивать фокус и не терять то, что человек как раз печатает.
+  function updateMessagesContent(){
+    const listWrap = document.getElementById('messagesListWrap');
+    if (listWrap) { listWrap.innerHTML = messagesListHtml(); bindMessagesListClicks(); }
+    const threadBody = document.getElementById('messagesThreadBody');
+    if (threadBody) { threadBody.innerHTML = messagesBubblesHtml(); scrollThreadToBottom(); }
+    document.getElementById('navCountMessages').textContent = conversations.reduce((s,c) => s + (c.unread||0), 0);
+  }
+
+  async function openMessageThread(userId){
+    activeMessageUserId = userId;
+    pendingAttachment = null;
+    replyingTo = null;
+    try { messageThread = await api('GET', '/messages/' + userId); }
+    catch(e) { messageThread = []; }
+    const conv = conversations.find(c => c.id === userId);
+    if (conv) conv.unread = 0;
+    renderMessagesTab();
+  }
+
+  async function sendChatMessage(){
+    const input = document.getElementById('messageInput');
+    const body = input.value.trim();
+    if (!body && !pendingAttachment) return;
+    if (!activeMessageUserId) return;
+    input.value = '';
+    closePopovers();
+    const attachment = pendingAttachment;
+    pendingAttachment = null;
+    renderAttachmentPreview();
+    const replyToId = replyingTo ? replyingTo.id : '';
+    replyingTo = null;
+    renderReplyPreview();
+    try {
+      const formData = new FormData();
+      formData.append('recipientId', activeMessageUserId);
+      formData.append('body', body);
+      if (attachment) formData.append('attachment', attachment);
+      if (replyToId) formData.append('replyToId', replyToId);
+      const res = await fetch('/api/messages', { method: 'POST', body: formData });
+      if (!res.ok) {
+        let msg = res.statusText;
+        try { const data = await res.json(); if (data.error) msg = data.error; } catch(e) {}
+        throw new Error(msg);
+      }
+      messageThread = await api('GET', '/messages/' + activeMessageUserId);
+      conversations = await api('GET', '/messages/conversations');
+      updateMessagesContent();
+    } catch(e) { alert(e.message || 'Не удалось отправить сообщение'); }
   }
 
   // ---------- Пользователи (только для admin) ----------

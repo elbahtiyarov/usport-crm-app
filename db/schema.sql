@@ -140,3 +140,29 @@ CREATE TABLE IF NOT EXISTS categories (
 INSERT INTO categories (name) VALUES ('Обувь'), ('Одежда'), ('Инвентарь'), ('Аксессуары'), ('Прочее')
 ON CONFLICT (name) DO NOTHING;
 
+-- Подтверждение согласования заказа: кто и когда одобрил переход
+-- с этапа "Согласование" на "Оплата" (это может сделать только admin).
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS approved_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
+
+-- Личные сообщения между пользователями (как в мессенджере).
+CREATE TABLE IF NOT EXISTS messages (
+  id SERIAL PRIMARY KEY,
+  sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  read_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(sender_id, recipient_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_unread ON messages(recipient_id, read_at);
+
+-- Вложение к сообщению (фото или документ) — необязательное.
+ALTER TABLE messages ALTER COLUMN body DROP NOT NULL;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachment_url TEXT;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachment_name TEXT;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachment_type TEXT;
+
+-- Ответ на конкретное сообщение (как в WhatsApp/Telegram).
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_id INTEGER REFERENCES messages(id) ON DELETE SET NULL;
+
