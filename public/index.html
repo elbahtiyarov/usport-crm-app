@@ -414,7 +414,8 @@
     .kp-sku-th, .kp-sku-td { width: 90px; }
     .kp-sku-td { color: #666; font-family: 'Barlow Condensed', Arial, sans-serif; font-weight: 600; letter-spacing: 0.02em; }
     .kp-qty-th, .kp-qty-td { text-align: center; width: 80px; }
-    .kp-price-th, .kp-price-td, .kp-sum-th, .kp-sum-td { text-align: right; width: 110px; }
+    .kp-price-th, .kp-price-td { text-align: right; width: 72px; }
+    .kp-sum-th, .kp-sum-td { text-align: right; width: 88px; }
     .kp-item-photo { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; display: block; }
     .kp-table tbody tr:nth-child(even) td { background: #F7F8FA !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .kp-table tfoot td {
@@ -1259,7 +1260,11 @@
         return;
       }
       const chosenPrice = p[priceTypeSelect.value] != null ? p[priceTypeSelect.value] : p.price;
-      modalItems.push({ name: p.name, qty: 1, price: chosenPrice, sku: p.sku||'', photoUrl: p.photoUrl||'', weight: p.weight||null, volume: p.volume||null });
+      modalItems.push({
+        name: p.name, qty: 1, price: chosenPrice, sku: p.sku||'', photoUrl: p.photoUrl||'',
+        weight: p.weight||null, volume: p.volume||null,
+        dealerPrice: p.dealerPrice||null, wholesalePrice: p.wholesalePrice||null, priceWithVat: p.priceWithVat||null
+      });
       rerenderItemRows();
       searchInput.value = '';
       catalogPick.innerHTML = renderCatalogOptions();
@@ -1333,7 +1338,7 @@
     `, async () => {
       const clientId = getVal('f_client');
       const client = clients.find(c => c.id === clientId);
-      const items = modalItems.filter(it => (it.name||'').trim() !== '').map(it => ({ name: it.name.trim(), qty: Number(it.qty)||0, price: Number(it.price)||0, sku: it.sku||'', photoUrl: it.photoUrl||'', weight: it.weight||null, volume: it.volume||null }));
+      const items = modalItems.filter(it => (it.name||'').trim() !== '').map(it => ({ name: it.name.trim(), qty: Number(it.qty)||0, price: Number(it.price)||0, sku: it.sku||'', photoUrl: it.photoUrl||'', weight: it.weight||null, volume: it.volume||null, dealerPrice: it.dealerPrice||null, wholesalePrice: it.wholesalePrice||null, priceWithVat: it.priceWithVat||null }));
       const data = { clientId: clientId || null, clientName: client ? client.name : 'Без клиента', items, stage: getVal('f_stage') };
       if (isEdit) await updateDoc('orders', order.id, data); else await addDoc('orders', data);
       closeModal();
@@ -1429,7 +1434,7 @@
       const type = getVal('f_doctype');
       const clientId = getVal('f_client');
       const client = clients.find(c => c.id === clientId);
-      const items = modalItems.filter(it => (it.name||'').trim() !== '').map(it => ({ name: it.name.trim(), qty: Number(it.qty)||0, price: Number(it.price)||0, sku: it.sku||'', photoUrl: it.photoUrl||'', weight: it.weight||null, volume: it.volume||null }));
+      const items = modalItems.filter(it => (it.name||'').trim() !== '').map(it => ({ name: it.name.trim(), qty: Number(it.qty)||0, price: Number(it.price)||0, sku: it.sku||'', photoUrl: it.photoUrl||'', weight: it.weight||null, volume: it.volume||null, dealerPrice: it.dealerPrice||null, wholesalePrice: it.wholesalePrice||null, priceWithVat: it.priceWithVat||null }));
       if (items.length === 0 && type !== 'contract') return alert('Добавьте хотя бы одну позицию');
       const data = {
         docType: type, clientId: clientId || null, clientName: client ? client.name : 'Без клиента', orderId: presetOrderId,
@@ -1463,15 +1468,25 @@
     const companyLine = [settings.legalAddress, settings.phone, settings.email].filter(Boolean).map(escapeHtml).join(' · ');
 
     const hasPhotos = (doc.items||[]).some(it => it.photoUrl);
+    const hasDealer = (doc.items||[]).some(it => it.dealerPrice);
+    const hasWholesale = (doc.items||[]).some(it => it.wholesalePrice);
+    const hasVat = (doc.items||[]).some(it => it.priceWithVat);
     const photoTh = hasPhotos ? '<th class="kp-photo-th"></th>' : '';
-    const rowsHtml = (doc.items||[]).map((it, i) => `<tr>${hasPhotos ? `<td class="kp-photo-td">${it.photoUrl ? `<img src="${it.photoUrl}" class="kp-item-photo" alt="">` : ''}</td>` : ''}<td class="kp-num-td">${i+1}</td><td class="kp-sku-td">${escapeHtml(it.sku||'—')}</td><td>${escapeHtml(it.name)}</td><td class="kp-qty-td">${it.qty}</td><td class="kp-price-td">${fmt(it.price)}</td><td class="kp-sum-td">${fmt(it.qty*it.price)}</td></tr>`).join('');
+    const extraTh = (hasDealer?'<th class="kp-price-th">Дилер</th>':'') + (hasWholesale?'<th class="kp-price-th">Опт</th>':'') + (hasVat?'<th class="kp-price-th">С НДС</th>':'');
+    const totalCols = 5 + (hasPhotos?1:0) + (hasDealer?1:0) + (hasWholesale?1:0) + (hasVat?1:0); // №, Артикул, Наименование, Кол-во, Цена + доп.
+    const rowsHtml = (doc.items||[]).map((it, i) => {
+      const extraTd = (hasDealer?`<td class="kp-price-td">${it.dealerPrice?fmt(it.dealerPrice):'—'}</td>`:'')
+        + (hasWholesale?`<td class="kp-price-td">${it.wholesalePrice?fmt(it.wholesalePrice):'—'}</td>`:'')
+        + (hasVat?`<td class="kp-price-td">${it.priceWithVat?fmt(it.priceWithVat):'—'}</td>`:'');
+      return `<tr>${hasPhotos ? `<td class="kp-photo-td">${it.photoUrl ? `<img src="${it.photoUrl}" class="kp-item-photo" alt="">` : ''}</td>` : ''}<td class="kp-num-td">${i+1}</td><td class="kp-sku-td">${escapeHtml(it.sku||'—')}</td><td>${escapeHtml(it.name)}</td><td class="kp-qty-td">${it.qty}</td><td class="kp-price-td">${fmt(it.price)}</td>${extraTd}<td class="kp-sum-td">${fmt(it.qty*it.price)}</td></tr>`;
+    }).join('');
     const totalWeight = (doc.items||[]).reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.weight)||0), 0);
     const totalVolume = (doc.items||[]).reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.volume)||0), 0);
     const dimsLine = (totalWeight || totalVolume)
       ? `<p style="font-size:11.5px;color:#666;margin-top:-6px;">Габариты: вес ${totalWeight.toFixed(2)} кг · объём ${totalVolume.toFixed(3)} м³</p>` : '';
     const itemsTable = (doc.items||[]).length ? `
-      <table class="kp-table"><thead><tr>${photoTh}<th>№</th><th class="kp-sku-th">Артикул</th><th>Наименование</th><th class="kp-qty-th">Кол-во</th><th class="kp-price-th">Цена</th><th class="kp-sum-th">Сумма</th></tr></thead>
-      <tbody>${rowsHtml}</tbody><tfoot><tr><td colspan="${hasPhotos ? 6 : 5}">Итого</td><td>${fmt(doc.amount)}</td></tr></tfoot></table>
+      <table class="kp-table"><thead><tr>${photoTh}<th>№</th><th class="kp-sku-th">Артикул</th><th>Наименование</th><th class="kp-qty-th">Кол-во</th><th class="kp-price-th">Цена</th>${extraTh}<th class="kp-sum-th">Сумма</th></tr></thead>
+      <tbody>${rowsHtml}</tbody><tfoot><tr><td colspan="${totalCols}">Итого</td><td>${fmt(doc.amount)}</td></tr></tfoot></table>
       ${dimsLine}` : '';
 
     let extraLine = '';

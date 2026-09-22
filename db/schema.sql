@@ -182,3 +182,13 @@ ALTER TABLE order_items ADD COLUMN IF NOT EXISTS volume NUMERIC(10,4);
 ALTER TABLE document_items ADD COLUMN IF NOT EXISTS weight NUMERIC(10,3);
 ALTER TABLE document_items ADD COLUMN IF NOT EXISTS volume NUMERIC(10,4);
 
+-- Остальные виды цены (дилер/опт/с НДС) на уровне позиции — чтобы в
+-- напечатанном КП/счёте/накладной можно было показать их все рядом,
+-- а не только ту, что была выбрана при добавлении.
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS dealer_price NUMERIC(12,2);
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS wholesale_price NUMERIC(12,2);
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS price_with_vat NUMERIC(12,2);
+ALTER TABLE document_items ADD COLUMN IF NOT EXISTS dealer_price NUMERIC(12,2);
+ALTER TABLE document_items ADD COLUMN IF NOT EXISTS wholesale_price NUMERIC(12,2);
+ALTER TABLE document_items ADD COLUMN IF NOT EXISTS price_with_vat NUMERIC(12,2);
+

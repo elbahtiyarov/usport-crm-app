@@ -134,17 +134,27 @@ function generateDocumentPdf({ doc, client, settings }) {
 
       // ---------- Таблица позиций ----------
       const items = doc.items || [];
-      let colPhoto = 0, colSku = 0, colQty = 46, colPrice = 78, colSum = 88;
-      if (hasPhotos) colPhoto = 34;
-      colSku = 62;
-      const colName = contentWidth - colPhoto - colSku - colQty - colPrice - colSum;
+      const hasDealer = items.some(it => it.dealerPrice);
+      const hasWholesale = items.some(it => it.wholesalePrice);
+      const hasVat = items.some(it => it.priceWithVat);
+      const priceColsCount = 1 + (hasDealer?1:0) + (hasWholesale?1:0) + (hasVat?1:0);
+      const priceW = priceColsCount > 1 ? 50 : 72;
+      const sumW = priceColsCount > 1 ? 68 : 82;
+      const skuW = priceColsCount > 2 ? 58 : 62;
+      const colQty = 40;
+      const colPhoto = hasPhotos ? 30 : 0;
+      const colName = contentWidth - colPhoto - skuW - colQty - priceW * priceColsCount - sumW;
+
       const cols = [
         { key: 'photo', w: colPhoto },
-        { key: 'sku', w: colSku, label: 'Артикул' },
+        { key: 'sku', w: skuW, label: 'Артикул' },
         { key: 'name', w: colName, label: 'Наименование' },
         { key: 'qty', w: colQty, label: 'Кол-во', align: 'center' },
-        { key: 'price', w: colPrice, label: 'Цена', align: 'right' },
-        { key: 'sum', w: colSum, label: 'Сумма', align: 'right' }
+        { key: 'price', w: priceW, label: 'Цена', align: 'right' },
+        ...(hasDealer ? [{ key: 'dealerPrice', w: priceW, label: 'Дилер', align: 'right' }] : []),
+        ...(hasWholesale ? [{ key: 'wholesalePrice', w: priceW, label: 'Опт', align: 'right' }] : []),
+        ...(hasVat ? [{ key: 'priceWithVat', w: priceW, label: 'С НДС', align: 'right' }] : []),
+        { key: 'sum', w: sumW, label: 'Сумма', align: 'right' }
       ].filter(c => c.w > 0);
 
       function colX(idx) {
@@ -157,10 +167,10 @@ function generateDocumentPdf({ doc, client, settings }) {
         const y = pdf.y;
         const h = 20;
         pdf.rect(left, y, contentWidth, h).fill(NAVY);
-        pdf.font('bold').fontSize(8.5).fillColor('#FFFFFF');
+        pdf.font('bold').fontSize(priceColsCount > 1 ? 7.5 : 8.5).fillColor('#FFFFFF');
         cols.forEach((c, i) => {
           if (c.key === 'photo') return;
-          pdf.text(c.label, colX(i) + 6, y + 6, { width: c.w - 10, align: c.align || 'left' });
+          pdf.text(c.label, colX(i) + 4, y + 7, { width: c.w - 8, align: c.align || 'left', lineBreak: false });
         });
         pdf.y = y + h;
       }
@@ -196,9 +206,13 @@ function generateDocumentPdf({ doc, client, settings }) {
               : c.key === 'name' ? (it.name || '')
               : c.key === 'qty' ? String(it.qty)
               : c.key === 'price' ? fmt(it.price)
+              : c.key === 'dealerPrice' ? (it.dealerPrice ? fmt(it.dealerPrice) : '—')
+              : c.key === 'wholesalePrice' ? (it.wholesalePrice ? fmt(it.wholesalePrice) : '—')
+              : c.key === 'priceWithVat' ? (it.priceWithVat ? fmt(it.priceWithVat) : '—')
               : fmt((Number(it.qty) || 0) * (Number(it.price) || 0));
-            pdf.font(c.key === 'sku' ? 'bold' : 'regular').fontSize(9).fillColor(c.key === 'sku' ? SOFT : INK)
-              .text(val, x, rowY + 6, { width: w, align: c.align || 'left' });
+            const isPriceCol = ['price','dealerPrice','wholesalePrice','priceWithVat','sum'].includes(c.key);
+            pdf.font(c.key === 'sku' ? 'bold' : 'regular').fontSize(isPriceCol && priceColsCount > 1 ? 8 : 9).fillColor(c.key === 'sku' ? SOFT : INK)
+              .text(val, x, rowY + 6, { width: w, align: c.align || 'left', lineBreak: isPriceCol ? false : true });
           });
 
           pdf.moveTo(left, rowY + rowH).lineTo(right, rowY + rowH).lineWidth(0.5).strokeColor(LINE).stroke();
@@ -211,8 +225,8 @@ function generateDocumentPdf({ doc, client, settings }) {
         pdf.moveTo(left, totalY).lineTo(right, totalY).lineWidth(1.5).strokeColor(NAVY).stroke();
         pdf.font('bold').fontSize(11).fillColor(NAVY)
           .text('Итого', colX(cols.length - 2) - 100, totalY + 6, { width: 100, align: 'right' });
-        pdf.font('bold').fontSize(11).fillColor(NAVY)
-          .text(fmt(doc.amount), colX(cols.length - 1) + 6, totalY + 6, { width: cols[cols.length - 1].w - 10, align: 'right' });
+        pdf.font('bold').fontSize(priceColsCount > 1 ? 9.5 : 11).fillColor(NAVY)
+          .text(fmt(doc.amount), colX(cols.length - 1) + 6, totalY + 6, { width: cols[cols.length - 1].w - 10, align: 'right', lineBreak: false });
         pdf.x = left;
         pdf.y = totalY + 26;
 

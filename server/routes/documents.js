@@ -39,7 +39,7 @@ const LIST_QUERY = `
   )
   SELECT d.*, u.email AS created_by_email, dn.doc_number, COALESCE(
     json_agg(
-      json_build_object('id', di.id, 'sku', di.sku, 'name', di.name, 'qty', di.qty, 'price', di.price, 'photoUrl', di.photo_url, 'weight', di.weight, 'volume', di.volume)
+      json_build_object('id', di.id, 'sku', di.sku, 'name', di.name, 'qty', di.qty, 'price', di.price, 'photoUrl', di.photo_url, 'weight', di.weight, 'volume', di.volume, 'dealerPrice', di.dealer_price, 'wholesalePrice', di.wholesale_price, 'priceWithVat', di.price_with_vat)
       ORDER BY di.id
     ) FILTER (WHERE di.id IS NOT NULL), '[]'
   ) AS items
@@ -61,8 +61,8 @@ async function insertItems(client, documentId, items) {
   for (const it of items) {
     if (!it.name || !String(it.name).trim()) continue;
     await client.query(
-      `INSERT INTO document_items (document_id, sku, name, qty, price, photo_url, weight, volume) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [documentId, it.sku || null, it.name, Number(it.qty) || 0, Number(it.price) || 0, it.photoUrl || null, it.weight || null, it.volume || null]
+      `INSERT INTO document_items (document_id, sku, name, qty, price, photo_url, weight, volume, dealer_price, wholesale_price, price_with_vat) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [documentId, it.sku || null, it.name, Number(it.qty) || 0, Number(it.price) || 0, it.photoUrl || null, it.weight || null, it.volume || null, it.dealerPrice || null, it.wholesalePrice || null, it.priceWithVat || null]
     );
   }
 }
