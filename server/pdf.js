@@ -61,7 +61,7 @@ function generateDocumentPdf({ doc, client, settings }) {
   return new Promise((resolve, reject) => {
     try {
       const meta = DOC_META[doc.docType] || DOC_META.kp;
-      const number = `${meta.prefix}-${String(doc.id).padStart(5, '0')}`;
+      const number = String(doc.docNumber || doc.id);
       const hasPhotos = (doc.items || []).some(it => it.photoUrl);
 
       const pdf = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
@@ -103,6 +103,10 @@ function generateDocumentPdf({ doc, client, settings }) {
         .text(`№ ${number}`, right - metaW, headTop, { width: metaW, align: 'right' });
       pdf.font('regular').fontSize(9).fillColor(SOFT)
         .text(`от ${fmtDate(doc.createdAt)}`, right - metaW, pdf.y + 1, { width: metaW, align: 'right' });
+      if (doc.createdByEmail) {
+        pdf.font('regular').fontSize(8.5).fillColor(SOFT)
+          .text(doc.createdByEmail, right - metaW, pdf.y + 1, { width: metaW, align: 'right' });
+      }
 
       const headBottom = Math.max(pdf.y, headTop + 42) + 10;
       pdf.moveTo(left, headBottom).lineTo(right, headBottom).lineWidth(1.5).strokeColor(NAVY).stroke();
@@ -211,6 +215,15 @@ function generateDocumentPdf({ doc, client, settings }) {
           .text(fmt(doc.amount), colX(cols.length - 1) + 6, totalY + 6, { width: cols[cols.length - 1].w - 10, align: 'right' });
         pdf.x = left;
         pdf.y = totalY + 26;
+
+        const totalWeight = items.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.weight)||0), 0);
+        const totalVolume = items.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.volume)||0), 0);
+        if (totalWeight || totalVolume) {
+          pdf.font('regular').fontSize(9).fillColor(SOFT)
+            .text(`Габариты: вес ${totalWeight.toFixed(2)} кг · объём ${totalVolume.toFixed(3)} м³`, left, pdf.y, { width: contentWidth });
+          pdf.x = left;
+          pdf.moveDown(0.5);
+        }
       }
 
       // ---------- Доп. поля по типу документа ----------

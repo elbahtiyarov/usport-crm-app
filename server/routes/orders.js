@@ -23,7 +23,7 @@ function mapOrder(r) {
 const LIST_QUERY = `
   SELECT o.*, u.email AS created_by_email, au.email AS approved_by_email, COALESCE(
     json_agg(
-      json_build_object('id', oi.id, 'sku', oi.sku, 'name', oi.name, 'qty', oi.qty, 'price', oi.price, 'photoUrl', oi.photo_url)
+      json_build_object('id', oi.id, 'sku', oi.sku, 'name', oi.name, 'qty', oi.qty, 'price', oi.price, 'photoUrl', oi.photo_url, 'weight', oi.weight, 'volume', oi.volume)
       ORDER BY oi.id
     ) FILTER (WHERE oi.id IS NOT NULL), '[]'
   ) AS items
@@ -52,8 +52,8 @@ async function insertItems(client, orderId, items) {
   for (const it of items) {
     if (!it.name || !String(it.name).trim()) continue;
     await client.query(
-      `INSERT INTO order_items (order_id, sku, name, qty, price, photo_url) VALUES ($1,$2,$3,$4,$5,$6)`,
-      [orderId, it.sku || null, it.name, Number(it.qty) || 0, Number(it.price) || 0, it.photoUrl || null]
+      `INSERT INTO order_items (order_id, sku, name, qty, price, photo_url, weight, volume) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [orderId, it.sku || null, it.name, Number(it.qty) || 0, Number(it.price) || 0, it.photoUrl || null, it.weight || null, it.volume || null]
     );
   }
 }

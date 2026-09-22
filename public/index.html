@@ -936,7 +936,7 @@
 
     wrap.innerHTML = list.length === 0 ? `<div class="empty-state">${q ? 'Ничего не найдено.' : 'Товаров пока нет. Добавьте первый через кнопку выше.'}</div>` : `
         <table>
-          <thead><tr><th></th><th>Артикул</th><th>Наименование</th><th>Категория</th><th>Цена</th><th>Характеристики</th><th>Автор</th><th></th></tr></thead>
+          <thead><tr><th></th><th>Артикул</th><th>Наименование</th><th>Категория</th><th>Цена</th><th>Вес</th><th>Объём</th><th>Характеристики</th><th>Автор</th><th></th></tr></thead>
           <tbody>
             ${list.map(p => `
               <tr>
@@ -945,7 +945,9 @@
                 <td class="cell-name">${escapeHtml(p.name)}</td>
                 <td>${escapeHtml(p.category||'—')}</td>
                 <td>${fmt(p.price)}</td>
-                <td style="max-width:240px;color:var(--ink-soft);font-size:13px;">${escapeHtml(p.specs||'—')}</td>
+                <td style="color:var(--ink-soft);font-size:13px;">${p.weight ? p.weight + ' кг' : '—'}</td>
+                <td style="color:var(--ink-soft);font-size:13px;">${p.volume ? p.volume + ' м³' : '—'}</td>
+                <td style="max-width:200px;color:var(--ink-soft);font-size:13px;">${escapeHtml(p.specs||'—')}</td>
                 <td style="color:var(--ink-soft);font-size:12.5px;">${escapeHtml(p.createdByEmail||'—')}</td>
                 <td><div class="row-actions">
                   ${canEdit(p) ? `
@@ -994,7 +996,18 @@
         </select></div>
       </div>
       <div class="field"><label>Наименование</label><input id="f_name" type="text" value="${escapeHtml(product?.name||'')}" placeholder="Кроссовки для бега Air Runner"></div>
-      <div class="field"><label>Цена, ₸</label><input id="f_price" type="number" min="0" value="${product?.price||''}" placeholder="32900"></div>
+      <div class="field-row">
+        <div class="field"><label>Цена, ₸</label><input id="f_price" type="number" min="0" value="${product?.price||''}" placeholder="32900"></div>
+        <div class="field"><label>Цена с НДС, ₸</label><input id="f_priceWithVat" type="number" min="0" value="${product?.priceWithVat||''}" placeholder="необязательно"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Дилерская цена, ₸</label><input id="f_dealerPrice" type="number" min="0" value="${product?.dealerPrice||''}" placeholder="необязательно"></div>
+        <div class="field"><label>Оптовая цена, ₸</label><input id="f_wholesalePrice" type="number" min="0" value="${product?.wholesalePrice||''}" placeholder="необязательно"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Вес, кг</label><input id="f_weight" type="number" min="0" step="0.001" value="${product?.weight||''}" placeholder="необязательно"></div>
+        <div class="field"><label>Объём, м³</label><input id="f_volume" type="number" min="0" step="0.0001" value="${product?.volume||''}" placeholder="необязательно"></div>
+      </div>
       <div class="field"><label>Характеристики</label><textarea id="f_specs" placeholder="Размеры 38–45, сетка + резина, вес 280г">${escapeHtml(product?.specs||'')}</textarea></div>
     `, async () => {
       const name = getVal('f_name').trim();
@@ -1012,7 +1025,16 @@
         } catch (e) { alert('Не удалось загрузить фото'); return; }
       }
 
-      const data = { sku: getVal('f_sku').trim(), category: getVal('f_category'), name, price: Number(getVal('f_price') || 0), specs: getVal('f_specs').trim(), photoUrl };
+      const data = {
+        sku: getVal('f_sku').trim(), category: getVal('f_category'), name,
+        price: Number(getVal('f_price') || 0),
+        priceWithVat: getVal('f_priceWithVat') ? Number(getVal('f_priceWithVat')) : null,
+        dealerPrice: getVal('f_dealerPrice') ? Number(getVal('f_dealerPrice')) : null,
+        wholesalePrice: getVal('f_wholesalePrice') ? Number(getVal('f_wholesalePrice')) : null,
+        weight: getVal('f_weight') ? Number(getVal('f_weight')) : null,
+        volume: getVal('f_volume') ? Number(getVal('f_volume')) : null,
+        specs: getVal('f_specs').trim(), photoUrl
+      };
       if (isEdit) await updateDoc('products', product.id, data); else await addDoc('products', data);
       closeModal();
     });
@@ -1125,7 +1147,18 @@
     });
   }
   function rerenderItemRows(){ document.getElementById('itemsRows').innerHTML = itemsRowsHtml(); bindItemsRows(); updateModalTotalDisplay(); }
-  function updateModalTotalDisplay(){ const el = document.getElementById('modalTotal'); if (el) el.textContent = fmt(computeModalTotal()); }
+  function computeModalTotalWeight(){ return modalItems.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.weight)||0), 0); }
+  function computeModalTotalVolume(){ return modalItems.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.volume)||0), 0); }
+  function updateModalTotalDisplay(){
+    const el = document.getElementById('modalTotal');
+    if (el) el.textContent = fmt(computeModalTotal());
+    const dims = document.getElementById('modalDimensions');
+    if (dims) {
+      const w = computeModalTotalWeight(), v = computeModalTotalVolume();
+      dims.style.display = (w || v) ? '' : 'none';
+      dims.textContent = `Вес: ${w ? w.toFixed(2) : 0} кг · Объём: ${v ? v.toFixed(3) : 0} м³`;
+    }
+  }
 
   function renderCatalogOptions(query = ''){
     const q = String(query || '').trim().toLowerCase();
@@ -1160,6 +1193,9 @@
             <select id="catalogPick">
               ${renderCatalogOptions()}
             </select>
+            <select id="catalogPriceType" style="max-width:170px;">
+              <option value="price">Цена</option>
+            </select>
             <button type="button" class="btn-ghost-sm" id="addFromCatalogBtn">Добавить</button>
           </div>
         </div>
@@ -1167,15 +1203,34 @@
           Введите артикул или часть названия товара
         </div>
         <div id="itemsRows" class="items-rows" style="margin-top:10px;">${itemsRowsHtml()}</div>
+        <div id="modalDimensions" style="display:none;font-size:12.5px;color:var(--ink-soft);margin-top:8px;"></div>
       </div>
     `;
   }
 
   function bindItemsBlock(){
     bindItemsRows();
+    updateModalTotalDisplay();
 
     const searchInput = document.getElementById('catalogSearch');
     const catalogPick = document.getElementById('catalogPick');
+    const priceTypeSelect = document.getElementById('catalogPriceType');
+
+    const PRICE_TIERS = [
+      { key: 'price', label: 'Розница' },
+      { key: 'dealerPrice', label: 'Дилер' },
+      { key: 'wholesalePrice', label: 'Опт' },
+      { key: 'priceWithVat', label: 'С НДС' }
+    ];
+
+    function updatePriceTierOptions(){
+      const p = products.find(x => x.id === catalogPick.value);
+      if (!p) { priceTypeSelect.innerHTML = '<option value="price">Цена</option>'; return; }
+      const available = PRICE_TIERS.filter(t => p[t.key] != null && p[t.key] !== '');
+      priceTypeSelect.innerHTML = available.map(t => `<option value="${t.key}">${t.label} — ${fmt(p[t.key])}</option>`).join('');
+    }
+    updatePriceTierOptions();
+    catalogPick.addEventListener('change', updatePriceTierOptions);
 
     searchInput.addEventListener('input', e => {
       const query = e.target.value;
@@ -1185,6 +1240,7 @@
       // Сохраняем выбранный товар, если он всё ещё подходит под поиск.
       const stillVisible = Array.from(catalogPick.options).some(o => o.value === currentValue);
       if (stillVisible) catalogPick.value = currentValue;
+      updatePriceTierOptions();
 
       const count = catalogPick.options.length - (catalogPick.options[0]?.value ? 0 : 1);
       const hint = document.getElementById('catalogSearchHint');
@@ -1202,10 +1258,12 @@
         searchInput.focus();
         return;
       }
-      modalItems.push({ name: p.name, qty: 1, price: p.price, sku: p.sku||'', photoUrl: p.photoUrl||'' });
+      const chosenPrice = p[priceTypeSelect.value] != null ? p[priceTypeSelect.value] : p.price;
+      modalItems.push({ name: p.name, qty: 1, price: chosenPrice, sku: p.sku||'', photoUrl: p.photoUrl||'', weight: p.weight||null, volume: p.volume||null });
       rerenderItemRows();
       searchInput.value = '';
       catalogPick.innerHTML = renderCatalogOptions();
+      updatePriceTierOptions();
       searchInput.focus();
     });
   }
@@ -1275,7 +1333,7 @@
     `, async () => {
       const clientId = getVal('f_client');
       const client = clients.find(c => c.id === clientId);
-      const items = modalItems.filter(it => (it.name||'').trim() !== '').map(it => ({ name: it.name.trim(), qty: Number(it.qty)||0, price: Number(it.price)||0, sku: it.sku||'', photoUrl: it.photoUrl||'' }));
+      const items = modalItems.filter(it => (it.name||'').trim() !== '').map(it => ({ name: it.name.trim(), qty: Number(it.qty)||0, price: Number(it.price)||0, sku: it.sku||'', photoUrl: it.photoUrl||'', weight: it.weight||null, volume: it.volume||null }));
       const data = { clientId: clientId || null, clientName: client ? client.name : 'Без клиента', items, stage: getVal('f_stage') };
       if (isEdit) await updateDoc('orders', order.id, data); else await addDoc('orders', data);
       closeModal();
@@ -1290,19 +1348,17 @@
     el.innerHTML = documents.length === 0 ? `<div class="panel"><div class="empty-state">Документов пока нет.</div></div>` : `
       <div class="panel">
         <table>
-          <thead><tr><th>Тип</th><th>№</th><th>Клиент</th><th>Сумма</th><th>Статус</th><th>Дата</th><th>Автор</th><th></th></tr></thead>
+          <thead><tr><th>Тип</th><th>№</th><th>Клиент</th><th>Сумма</th><th>Статус</th><th></th></tr></thead>
           <tbody>
             ${documents.map(d => `
               <tr>
                 <td><span class="badge type-${d.docType}">${docTypeMeta(d.docType).label}</span></td>
-                <td class="mono">${docTypeMeta(d.docType).prefix}-${d.id.padStart(5,'0')}</td>
+                <td class="mono">№${d.docNumber||d.id}<div class="cell-sub" style="font-family:var(--font-body,inherit);font-weight:400;">от ${fmtDate(d.createdAt)}${d.createdByEmail ? ', ' + escapeHtml(d.createdByEmail) : ''}</div></td>
                 <td>${escapeHtml(d.clientName||'—')}</td>
                 <td>${fmt(d.amount)}</td>
                 <td>${canEdit(d)
                   ? `<select class="status-select" data-status="${d.id}">${DOC_STATUSES.map(s => `<option value="${s.id}" ${d.status===s.id?'selected':''}>${s.label}</option>`).join('')}</select>`
                   : `<span class="badge status-${d.status}">${DOC_STATUSES.find(s=>s.id===d.status)?.label||d.status}</span>`}</td>
-                <td style="color:var(--ink-soft);font-size:13px;">${fmtDate(d.createdAt)}</td>
-                <td style="color:var(--ink-soft);font-size:12.5px;">${escapeHtml(d.createdByEmail||'—')}</td>
                 <td><div class="row-actions">
                   <button class="btn-ghost-sm" data-print="${d.id}">Печать</button>
                   <a class="btn-ghost-sm" href="/api/documents/${d.id}/pdf" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">Скачать PDF</a>
@@ -1373,7 +1429,7 @@
       const type = getVal('f_doctype');
       const clientId = getVal('f_client');
       const client = clients.find(c => c.id === clientId);
-      const items = modalItems.filter(it => (it.name||'').trim() !== '').map(it => ({ name: it.name.trim(), qty: Number(it.qty)||0, price: Number(it.price)||0, sku: it.sku||'', photoUrl: it.photoUrl||'' }));
+      const items = modalItems.filter(it => (it.name||'').trim() !== '').map(it => ({ name: it.name.trim(), qty: Number(it.qty)||0, price: Number(it.price)||0, sku: it.sku||'', photoUrl: it.photoUrl||'', weight: it.weight||null, volume: it.volume||null }));
       if (items.length === 0 && type !== 'contract') return alert('Добавьте хотя бы одну позицию');
       const data = {
         docType: type, clientId: clientId || null, clientName: client ? client.name : 'Без клиента', orderId: presetOrderId,
@@ -1400,7 +1456,7 @@
   function printDocument(doc){
     if (!doc) return;
     const meta = docTypeMeta(doc.docType);
-    const number = `${meta.prefix}-${String(doc.id).padStart(5,'0')}`;
+    const number = String(doc.docNumber || doc.id);
     const client = clients.find(c => c.id === doc.clientId);
     const logoSrc = settings.logoUrl || '/logo.png';
     const logoHtml = `<img src="${logoSrc}" alt="logo" class="kp-logo-img">`;
@@ -1409,9 +1465,14 @@
     const hasPhotos = (doc.items||[]).some(it => it.photoUrl);
     const photoTh = hasPhotos ? '<th class="kp-photo-th"></th>' : '';
     const rowsHtml = (doc.items||[]).map((it, i) => `<tr>${hasPhotos ? `<td class="kp-photo-td">${it.photoUrl ? `<img src="${it.photoUrl}" class="kp-item-photo" alt="">` : ''}</td>` : ''}<td class="kp-num-td">${i+1}</td><td class="kp-sku-td">${escapeHtml(it.sku||'—')}</td><td>${escapeHtml(it.name)}</td><td class="kp-qty-td">${it.qty}</td><td class="kp-price-td">${fmt(it.price)}</td><td class="kp-sum-td">${fmt(it.qty*it.price)}</td></tr>`).join('');
+    const totalWeight = (doc.items||[]).reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.weight)||0), 0);
+    const totalVolume = (doc.items||[]).reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.volume)||0), 0);
+    const dimsLine = (totalWeight || totalVolume)
+      ? `<p style="font-size:11.5px;color:#666;margin-top:-6px;">Габариты: вес ${totalWeight.toFixed(2)} кг · объём ${totalVolume.toFixed(3)} м³</p>` : '';
     const itemsTable = (doc.items||[]).length ? `
       <table class="kp-table"><thead><tr>${photoTh}<th>№</th><th class="kp-sku-th">Артикул</th><th>Наименование</th><th class="kp-qty-th">Кол-во</th><th class="kp-price-th">Цена</th><th class="kp-sum-th">Сумма</th></tr></thead>
-      <tbody>${rowsHtml}</tbody><tfoot><tr><td colspan="${hasPhotos ? 6 : 5}">Итого</td><td>${fmt(doc.amount)}</td></tr></tfoot></table>` : '';
+      <tbody>${rowsHtml}</tbody><tfoot><tr><td colspan="${hasPhotos ? 6 : 5}">Итого</td><td>${fmt(doc.amount)}</td></tr></tfoot></table>
+      ${dimsLine}` : '';
 
     let extraLine = '';
     if (doc.docType === 'kp' && doc.validUntil) extraLine = `<div class="kp-line-item"><span class="kp-line-label">Действительно до:</span><span>${new Date(doc.validUntil).toLocaleDateString('ru-RU')}</span></div>`;
@@ -1462,6 +1523,7 @@
           <div class="kp-meta-box">
             <div class="kp-meta-num">№ ${number}</div>
             от ${new Date(doc.createdAt).toLocaleDateString('ru-RU')}
+            ${doc.createdByEmail ? `<br>${escapeHtml(doc.createdByEmail)}` : ''}
           </div>
         </div>
         <h2>${meta.title}</h2>

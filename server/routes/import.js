@@ -52,15 +52,17 @@ async function upsertProducts(rows, userId) {
            category = COALESCE(NULLIF($3, ''), category),
            price = $4,
            specs = COALESCE(NULLIF($5, ''), specs),
-           photo_url = COALESCE(photo_url, $6)
+           photo_url = COALESCE(photo_url, $6),
+           weight = COALESCE($8, weight),
+           volume = COALESCE($9, volume)
          WHERE id = $7`,
-        [r.sku || '', r.name, r.category || '', r.price, r.specs || '', r.photoUrl || null, match.id]
+        [r.sku || '', r.name, r.category || '', r.price, r.specs || '', r.photoUrl || null, match.id, r.weight || null, r.volume || null]
       );
       updated++;
     } else {
       await pool.query(
-        `INSERT INTO products (sku, name, category, price, specs, photo_url, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [r.sku || null, r.name, r.category || null, r.price, r.specs || null, r.photoUrl || null, userId]
+        `INSERT INTO products (sku, name, category, price, specs, photo_url, weight, volume, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [r.sku || null, r.name, r.category || null, r.price, r.specs || null, r.photoUrl || null, r.weight || null, r.volume || null, userId]
       );
       inserted++;
     }

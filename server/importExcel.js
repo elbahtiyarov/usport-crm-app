@@ -88,7 +88,7 @@ function parseProducts(workbook) {
       if (weight) specParts.push(`Вес: ${weight} кг`);
       if (volume) specParts.push(`Объём: ${volume} м³`);
 
-      rows.push({ sku, name, category, price, specs: specParts.join(' · ') });
+      rows.push({ sku, name, category, price, weight, volume, specs: specParts.join(' · ') });
     }
     if (rows.length) return rows; // нашли и разобрали лист — этого достаточно
   }

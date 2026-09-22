@@ -166,3 +166,19 @@ ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachment_type TEXT;
 -- Ответ на конкретное сообщение (как в WhatsApp/Telegram).
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_id INTEGER REFERENCES messages(id) ON DELETE SET NULL;
 
+-- Вес/объём товара (для расчёта габаритов заказа) и дополнительные виды
+-- цены (дилер/опт/с НДС) — базовая "price" остаётся как есть (розница).
+ALTER TABLE products ADD COLUMN IF NOT EXISTS weight NUMERIC(10,3);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS volume NUMERIC(10,4);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS dealer_price NUMERIC(12,2);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS wholesale_price NUMERIC(12,2);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS price_with_vat NUMERIC(12,2);
+
+-- Те же вес/объём — на уровне позиции заказа/документа (переносятся из
+-- каталога при добавлении, как sku/photo_url), чтобы считать итог по всему
+-- заказу/документу, даже если товар в каталоге потом изменится.
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS weight NUMERIC(10,3);
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS volume NUMERIC(10,4);
+ALTER TABLE document_items ADD COLUMN IF NOT EXISTS weight NUMERIC(10,3);
+ALTER TABLE document_items ADD COLUMN IF NOT EXISTS volume NUMERIC(10,4);
+
