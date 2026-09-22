@@ -413,9 +413,9 @@
     .kp-num-td { width: 34px; color: #888; }
     .kp-sku-th, .kp-sku-td { width: 90px; }
     .kp-sku-td { color: #666; font-family: 'Barlow Condensed', Arial, sans-serif; font-weight: 600; letter-spacing: 0.02em; }
-    .kp-qty-th, .kp-qty-td { text-align: center; width: 80px; }
-    .kp-price-th, .kp-price-td { text-align: right; width: 72px; }
-    .kp-sum-th, .kp-sum-td { text-align: right; width: 88px; }
+    .kp-qty-th, .kp-qty-td { text-align: center; width: 80px; white-space: nowrap; }
+    .kp-price-th, .kp-price-td { text-align: right; width: 72px; white-space: nowrap; }
+    .kp-sum-th, .kp-sum-td { text-align: right; width: 88px; white-space: nowrap; }
     .kp-item-photo { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; display: block; }
     .kp-table tbody tr:nth-child(even) td { background: #F7F8FA !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .kp-table tfoot td {
@@ -624,6 +624,7 @@
     { id: 'payment', label: 'Оплата' },
     { id: 'production', label: 'Производство' },
     { id: 'shipment', label: 'Отгрузка' },
+    { id: 'done', label: 'Завершён' },
     { id: 'cancelled', label: 'Отменён' }
   ];
   const SOURCES = ['Instagram', 'WhatsApp', 'Звонок', 'Сайт', 'Рекомендация'];
@@ -825,9 +826,9 @@
   function renderStats(){
     document.getElementById('statProducts').textContent = products.length;
     document.getElementById('statClients').textContent = clients.length;
-    const pipeline = orders.filter(o => o.stage !== 'shipment' && o.stage !== 'cancelled').reduce((s,o) => s + Number(o.amount||0), 0);
+    const pipeline = orders.filter(o => !['shipment','done','cancelled'].includes(o.stage)).reduce((s,o) => s + Number(o.amount||0), 0);
     document.getElementById('statPipeline').textContent = fmt(pipeline);
-    const shipped = orders.filter(o => o.stage === 'shipment').reduce((s,o) => s + Number(o.amount||0), 0);
+    const shipped = orders.filter(o => o.stage === 'shipment' || o.stage === 'done').reduce((s,o) => s + Number(o.amount||0), 0);
     document.getElementById('statShipped').textContent = fmt(shipped);
   }
 
@@ -1089,6 +1090,7 @@
                 <td style="max-width:220px;color:var(--ink-soft);font-size:13px;">${escapeHtml(c.notes||'—')}</td>
                 <td style="color:var(--ink-soft);font-size:12.5px;">${escapeHtml(c.createdByEmail||'—')}</td>
                 <td><div class="row-actions">
+                  <button class="btn-ghost-sm" data-history="${c.id}">История</button>
                   ${canEdit(c) ? `
                     <button class="btn-ghost-sm" data-edit="${c.id}">Изменить</button>
                     <button class="btn-danger-sm" data-del="${c.id}">Удалить</button>
@@ -1101,6 +1103,55 @@
 
     wrap.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openClientModal(clients.find(c => c.id === b.dataset.edit))));
     wrap.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => { if (confirm('Удалить клиента?')) deleteDoc('clients', b.dataset.del); }));
+    wrap.querySelectorAll('[data-history]').forEach(b => b.addEventListener('click', () => openClientHistoryModal(clients.find(c => c.id === b.dataset.history))));
+  }
+
+  function openClientHistoryModal(client){
+    if (!client) return;
+    const clientOrders = orders.filter(o => o.clientId === client.id);
+    const clientDocs = documents.filter(d => d.clientId === client.id);
+    const totalOrdersSum = clientOrders.reduce((s,o) => s + Number(o.amount||0), 0);
+
+    const ordersHtml = clientOrders.length === 0 ? '<div class="empty-state" style="padding:24px 0;">Заказов пока нет.</div>' : `
+      <table>
+        <thead><tr><th>Этап</th><th>Состав</th><th>Сумма</th><th>Дата</th></tr></thead>
+        <tbody>
+          ${clientOrders.map(o => `
+            <tr>
+              <td><span class="badge role-manager">${STAGES.find(s=>s.id===o.stage)?.label||o.stage}</span></td>
+              <td style="max-width:220px;color:var(--ink-soft);font-size:13px;">${(o.items||[]).slice(0,2).map(it=>escapeHtml(it.name)).join(', ')}${(o.items||[]).length>2?` и ещё ${o.items.length-2}`:''}</td>
+              <td>${fmt(o.amount)}</td>
+              <td style="color:var(--ink-soft);font-size:13px;">${fmtDate(o.createdAt)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+
+    const docsHtml = clientDocs.length === 0 ? '<div class="empty-state" style="padding:24px 0;">Документов пока нет.</div>' : `
+      <table>
+        <thead><tr><th>Тип</th><th>№</th><th>Сумма</th><th>Статус</th><th>Дата</th></tr></thead>
+        <tbody>
+          ${clientDocs.map(d => `
+            <tr>
+              <td><span class="badge type-${d.docType}">${docTypeMeta(d.docType).label}</span></td>
+              <td class="mono">№${d.docNumber||d.id}</td>
+              <td>${fmt(d.amount)}</td>
+              <td><span class="badge status-${d.status}">${DOC_STATUSES.find(s=>s.id===d.status)?.label||d.status}</span></td>
+              <td style="color:var(--ink-soft);font-size:13px;">${fmtDate(d.createdAt)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+
+    renderModal(`
+      <h3>История — ${escapeHtml(client.name)}</h3>
+      <p class="login-sub" style="text-align:left;margin-bottom:14px;">Заказов: ${clientOrders.length} на сумму ${fmt(totalOrdersSum)} · Документов: ${clientDocs.length}</p>
+      <div class="field"><label>Заказы</label>${ordersHtml}</div>
+      <div class="field"><label>Документы</label>${docsHtml}</div>
+    `, null);
+    document.getElementById('modalSave').style.display = 'none';
+    document.getElementById('modalCancel').textContent = 'Закрыть';
+    modalBox.classList.add('wide');
   }
 
   function openClientModal(client){
