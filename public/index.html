@@ -2156,7 +2156,9 @@
     document.getElementById('modalSave').addEventListener('click', onSave);
   }
   function closeModal(){ overlay.classList.remove('open'); }
-  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+  // Клик мимо окна намеренно НЕ закрывает модалку — люди случайно теряли
+  // введённые данные при промахе мышкой. Закрыть можно только явной
+  // кнопкой «Отмена»/«Закрыть» или крестиком.
 
   checkAuth();
 })();
