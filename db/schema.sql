@@ -209,3 +209,7 @@ UPDATE products SET vat_rate = 16, price_with_vat = ROUND(price * 1.16, 2)
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS vat_included BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE documents ADD COLUMN IF NOT EXISTS vat_included BOOLEAN NOT NULL DEFAULT false;
 
+-- Номер регистрационного документа ИП (талон/лицензия) — используется во
+-- вступительной части типового текста договора поставки.
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS license_number TEXT;
+

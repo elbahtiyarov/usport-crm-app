@@ -168,6 +168,8 @@ router.get('/:id/pdf', async (req, res, next) => {
       legalAddress: s.legal_address || '',
       phone: s.phone || '',
       email: s.email || '',
+      directorName: s.director_name || '',
+      licenseNumber: s.license_number || '',
       requisites: s.requisites || '',
       logoUrl: s.logo_url || ''
     };

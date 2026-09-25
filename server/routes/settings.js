@@ -12,6 +12,7 @@ function mapSettings(r) {
     phone: r.phone || '',
     email: r.email || '',
     directorName: r.director_name || '',
+    licenseNumber: r.license_number || '',
     requisites: r.requisites || '',
     logoUrl: r.logo_url || ''
   };
@@ -26,11 +27,11 @@ router.get('/', async (req, res, next) => {
 
 router.put('/', async (req, res, next) => {
   try {
-    const { name, legalAddress, phone, email, directorName, requisites } = req.body;
+    const { name, legalAddress, phone, email, directorName, licenseNumber, requisites } = req.body;
     const { rows } = await pool.query(
-      `UPDATE settings SET name=$1, legal_address=$2, phone=$3, email=$4, director_name=$5, requisites=$6
+      `UPDATE settings SET name=$1, legal_address=$2, phone=$3, email=$4, director_name=$5, license_number=$6, requisites=$7
        WHERE id=1 RETURNING *`,
-      [name || 'USPORT', legalAddress || null, phone || null, email || null, directorName || null, requisites || null]
+      [name || 'USPORT', legalAddress || null, phone || null, email || null, directorName || null, licenseNumber || null, requisites || null]
     );
     res.json(mapSettings(rows[0]));
   } catch (e) { next(e); }
