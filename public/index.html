@@ -361,6 +361,7 @@
   #logoFileInput { display: none; }
 
   #printArea { display: none; }
+  .kp-appendix-break { page-break-before: always; break-before: page; }
   @media print {
     @page { margin: 14mm 16mm; }
     body * { visibility: hidden; }
@@ -1684,13 +1685,38 @@
       </div>`;
 
     const signLabels = doc.docType === 'waybill' ? ['Отпустил', 'Получил'] : ['Поставщик', 'Покупатель'];
+    function signBlockHtml(){
+      return `
+        <div class="kp-sign">
+          <div>
+            <div class="kp-sign-line"></div>
+            <div class="kp-sign-role">${signLabels[0]}</div>
+            ${doc.docType!=='waybill' ? `<div class="kp-sign-name">${escapeHtml(settings.name||'USPORT')}</div>` : ''}
+          </div>
+          <div>
+            <div class="kp-sign-line"></div>
+            <div class="kp-sign-role">${signLabels[1]}</div>
+            ${doc.docType!=='waybill' ? `<div class="kp-sign-name">${escapeHtml(doc.clientName||'Клиент')}</div>` : ''}
+          </div>
+        </div>`;
+    }
 
     let bodyContent;
+    let skipFinalSign = false;
     if (doc.docType === 'contract') {
+      skipFinalSign = true;
       bodyContent = `
         ${clientBox}
         <p>${escapeHtml(doc.notes || contractTemplate(doc.clientName, doc.amount))}</p>
-        ${itemsTable ? `<p style="margin-top:16px;"><strong>Приложение №1. Спецификация</strong></p>${itemsTable}` : ''}
+        ${signBlockHtml()}
+        ${itemsTable ? `
+          <div class="kp-appendix-break"></div>
+          <h2 style="margin-top:0;">ПРИЛОЖЕНИЕ №1</h2>
+          <p style="text-align:center;color:#666;margin-top:-10px;">к Договору поставки № ${number} от ${new Date(doc.createdAt).toLocaleDateString('ru-RU')}</p>
+          <p style="text-align:center;font-weight:700;letter-spacing:0.05em;">СПЕЦИФИКАЦИЯ</p>
+          ${itemsTable}
+          ${signBlockHtml()}
+        ` : ''}
       `;
     } else {
       bodyContent = `
@@ -1720,18 +1746,7 @@
         </div>
         <h2>${meta.title}</h2>
         ${bodyContent}
-        <div class="kp-sign">
-          <div>
-            <div class="kp-sign-line"></div>
-            <div class="kp-sign-role">${signLabels[0]}</div>
-            ${doc.docType!=='waybill' ? `<div class="kp-sign-name">${escapeHtml(settings.name||'USPORT')}</div>` : ''}
-          </div>
-          <div>
-            <div class="kp-sign-line"></div>
-            <div class="kp-sign-role">${signLabels[1]}</div>
-            ${doc.docType!=='waybill' ? `<div class="kp-sign-name">${escapeHtml(doc.clientName||'Клиент')}</div>` : ''}
-          </div>
-        </div>
+        ${skipFinalSign ? '' : signBlockHtml()}
         <div class="kp-footer-note">Документ сформирован в USPORT CRM · ${new Date().toLocaleDateString('ru-RU')}</div>
       </div>
     `;

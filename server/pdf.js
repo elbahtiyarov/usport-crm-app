@@ -206,7 +206,8 @@ function generateDocumentPdf({ doc, client, settings }) {
       pdf.roundedRect(left, clientBoxTop, contentWidth, clientBoxBottom - clientBoxTop, 3).strokeColor(LINE).lineWidth(1).stroke();
       pdf.y = clientBoxBottom + 14;
 
-      // ---------- Таблица позиций ----------
+      // ---------- Таблица позиций (обёрнуто в функцию — для договора
+      // вызывается позже, после текста и первой подписи, как «Приложение №1») ----------
       const items = doc.items || [];
       const hasDealer = items.some(it => it.dealerPrice);
       const hasWholesale = items.some(it => it.wholesalePrice);
@@ -257,7 +258,8 @@ function generateDocumentPdf({ doc, client, settings }) {
         }
       }
 
-      if (items.length) {
+      function drawItemsTable() {
+        if (!items.length) return;
         drawTableHeader();
         items.forEach((it, i) => {
           pdf.font('regular').fontSize(9);
@@ -321,57 +323,89 @@ function generateDocumentPdf({ doc, client, settings }) {
         }
       }
 
-      // ---------- Доп. поля по типу документа ----------
-      pdf.x = left;
-      pdf.font('regular').fontSize(9.5).fillColor(INK);
-      if (doc.docType === 'kp' && doc.validUntil) {
-        pdf.text(`Действительно до: ${fmtDate(doc.validUntil)}`, left, pdf.y, { width: contentWidth }); pdf.x = left; pdf.moveDown(0.4);
-      }
-      if (doc.docType === 'invoice' && doc.dueDate) {
-        pdf.text(`Оплатить до: ${fmtDate(doc.dueDate)}`, left, pdf.y, { width: contentWidth }); pdf.x = left; pdf.moveDown(0.4);
-      }
-      if (doc.docType === 'waybill' && doc.shipDate) {
-        pdf.text(`Дата отгрузки: ${fmtDate(doc.shipDate)}`, left, pdf.y, { width: contentWidth }); pdf.x = left; pdf.moveDown(0.4);
-      }
-
-      if (doc.docType === 'invoice' && settings.requisites) {
-        ensureSpace(50);
+      function drawSignatures() {
         pdf.x = left;
-        pdf.font('bold').fontSize(9).fillColor(NAVY).text('РЕКВИЗИТЫ ДЛЯ ОПЛАТЫ', left, pdf.y, { width: contentWidth });
+        ensureSpace(70);
+        const signY = Math.max(pdf.y + 40, bottomLimit - 60);
+        const signW = contentWidth / 2 - 20;
+        const signLabels = doc.docType === 'waybill' ? ['Отпустил', 'Получил'] : ['Поставщик', 'Покупатель'];
+        pdf.moveTo(left, signY).lineTo(left + signW, signY).lineWidth(1).strokeColor(INK).stroke();
+        pdf.moveTo(right - signW, signY).lineTo(right, signY).lineWidth(1).strokeColor(INK).stroke();
+        pdf.font('regular').fontSize(8.5).fillColor(SOFT)
+          .text(signLabels[0], left, signY + 4, { width: signW })
+          .text(signLabels[1], right - signW, signY + 4, { width: signW, align: 'left' });
         pdf.x = left;
-        pdf.font('regular').fontSize(9).fillColor(INK).text(settings.requisites, left, pdf.y, { width: contentWidth });
-        pdf.x = left;
-        pdf.moveDown(0.6);
+        pdf.y = signY + 26;
       }
 
       if (doc.docType === 'contract') {
+        // Договор: сначала сам текст, потом подпись под договором,
+        // затем новая страница — «Приложение №1» со спецификацией и
+        // отдельной подписью под ней (так принято оформлять поставку).
         ensureSpace(40);
         pdf.x = left;
         pdf.font('regular').fontSize(9.5).fillColor(INK)
           .text(doc.notes || contractTemplate(settings.name || 'USPORT', doc.clientName, doc.amount, settings.directorName, settings.licenseNumber), left, pdf.y, { width: contentWidth });
         pdf.x = left;
-        pdf.moveDown(0.6);
-      } else if (doc.notes) {
-        ensureSpace(40);
-        pdf.x = left;
-        pdf.font('bold').fontSize(9).fillColor(NAVY).text('УСЛОВИЯ', left, pdf.y, { width: contentWidth });
-        pdf.x = left;
-        pdf.font('regular').fontSize(9).fillColor(INK).text(doc.notes, left, pdf.y, { width: contentWidth });
-        pdf.x = left;
-        pdf.moveDown(0.6);
-      }
+        pdf.moveDown(0.8);
 
-      // ---------- Подписи ----------
-      pdf.x = left;
-      ensureSpace(70);
-      const signY = Math.max(pdf.y + 40, bottomLimit - 60);
-      const signW = contentWidth / 2 - 20;
-      const signLabels = doc.docType === 'waybill' ? ['Отпустил', 'Получил'] : ['Поставщик', 'Покупатель'];
-      pdf.moveTo(left, signY).lineTo(left + signW, signY).lineWidth(1).strokeColor(INK).stroke();
-      pdf.moveTo(right - signW, signY).lineTo(right, signY).lineWidth(1).strokeColor(INK).stroke();
-      pdf.font('regular').fontSize(8.5).fillColor(SOFT)
-        .text(signLabels[0], left, signY + 4, { width: signW })
-        .text(signLabels[1], right - signW, signY + 4, { width: signW, align: 'left' });
+        drawSignatures();
+
+        if (items.length) {
+          pdf.addPage();
+          pdf.y = pdf.page.margins.top;
+          pdf.x = left;
+          pdf.font('bold').fontSize(13).fillColor(NAVY).text('ПРИЛОЖЕНИЕ №1', left, pdf.y, { width: contentWidth, align: 'center' });
+          pdf.x = left;
+          pdf.font('regular').fontSize(9).fillColor(SOFT)
+            .text(`к Договору поставки № ${number} от ${fmtDate(doc.createdAt)}`, left, pdf.y, { width: contentWidth, align: 'center' });
+          pdf.x = left;
+          pdf.moveDown(0.3);
+          pdf.font('bold').fontSize(10).fillColor(INK).text('СПЕЦИФИКАЦИЯ', left, pdf.y, { width: contentWidth, align: 'center' });
+          pdf.x = left;
+          pdf.moveDown(0.8);
+
+          drawItemsTable();
+          drawSignatures();
+        }
+      } else {
+        drawItemsTable();
+
+        // ---------- Доп. поля по типу документа ----------
+        pdf.x = left;
+        pdf.font('regular').fontSize(9.5).fillColor(INK);
+        if (doc.docType === 'kp' && doc.validUntil) {
+          pdf.text(`Действительно до: ${fmtDate(doc.validUntil)}`, left, pdf.y, { width: contentWidth }); pdf.x = left; pdf.moveDown(0.4);
+        }
+        if (doc.docType === 'invoice' && doc.dueDate) {
+          pdf.text(`Оплатить до: ${fmtDate(doc.dueDate)}`, left, pdf.y, { width: contentWidth }); pdf.x = left; pdf.moveDown(0.4);
+        }
+        if (doc.docType === 'waybill' && doc.shipDate) {
+          pdf.text(`Дата отгрузки: ${fmtDate(doc.shipDate)}`, left, pdf.y, { width: contentWidth }); pdf.x = left; pdf.moveDown(0.4);
+        }
+
+        if (doc.docType === 'invoice' && settings.requisites) {
+          ensureSpace(50);
+          pdf.x = left;
+          pdf.font('bold').fontSize(9).fillColor(NAVY).text('РЕКВИЗИТЫ ДЛЯ ОПЛАТЫ', left, pdf.y, { width: contentWidth });
+          pdf.x = left;
+          pdf.font('regular').fontSize(9).fillColor(INK).text(settings.requisites, left, pdf.y, { width: contentWidth });
+          pdf.x = left;
+          pdf.moveDown(0.6);
+        }
+
+        if (doc.notes) {
+          ensureSpace(40);
+          pdf.x = left;
+          pdf.font('bold').fontSize(9).fillColor(NAVY).text('УСЛОВИЯ', left, pdf.y, { width: contentWidth });
+          pdf.x = left;
+          pdf.font('regular').fontSize(9).fillColor(INK).text(doc.notes, left, pdf.y, { width: contentWidth });
+          pdf.x = left;
+          pdf.moveDown(0.6);
+        }
+
+        drawSignatures();
+      }
 
       // ---------- Подвал ----------
       pdf.font('regular').fontSize(7.5).fillColor(SOFT)
