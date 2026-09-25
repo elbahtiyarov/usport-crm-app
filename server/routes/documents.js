@@ -4,9 +4,19 @@ const pool = require('../db');
 const { assertOwnership } = require('../ownership');
 const { generateDocumentPdf } = require('../pdf');
 
+const VAT_RATE = 16; // стандартная ставка НДС в Казахстане с 1 января 2026
+
 function toDateStr(d) { return d ? new Date(d).toISOString().slice(0, 10) : ''; }
 
+function computeAmount(items, vatIncluded) {
+  const base = items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.price) || 0), 0);
+  return vatIncluded ? Math.round(base * (1 + VAT_RATE / 100) * 100) / 100 : base;
+}
+
 function mapDocument(r) {
+  const amount = Number(r.amount);
+  const vatIncluded = !!r.vat_included;
+  const baseAmount = vatIncluded ? Math.round((amount / (1 + VAT_RATE / 100)) * 100) / 100 : amount;
   return {
     id: String(r.id),
     docNumber: r.doc_number != null ? Number(r.doc_number) : null,
@@ -14,7 +24,11 @@ function mapDocument(r) {
     clientId: r.client_id != null ? String(r.client_id) : null,
     clientName: r.client_name || '',
     orderId: r.order_id != null ? String(r.order_id) : null,
-    amount: Number(r.amount),
+    amount,
+    vatIncluded,
+    vatRate: VAT_RATE,
+    baseAmount,
+    vatAmount: vatIncluded ? Math.round((amount - baseAmount) * 100) / 100 : 0,
     status: r.status,
     notes: r.notes || '',
     validUntil: toDateStr(r.valid_until),
@@ -70,13 +84,13 @@ async function insertItems(client, documentId, items) {
 router.post('/', async (req, res, next) => {
   const client = await pool.connect();
   try {
-    const { docType, clientId, clientName, orderId, items = [], notes, status, validUntil, dueDate, shipDate, signDate } = req.body;
-    const amount = items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.price) || 0), 0);
+    const { docType, clientId, clientName, orderId, items = [], notes, status, validUntil, dueDate, shipDate, signDate, vatIncluded } = req.body;
+    const amount = computeAmount(items, !!vatIncluded);
     await client.query('BEGIN');
     const { rows } = await client.query(
-      `INSERT INTO documents (doc_type, client_id, client_name, order_id, amount, status, notes, valid_until, due_date, ship_date, sign_date, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-      [docType, clientId || null, clientName || null, orderId || null, amount, status || 'draft', notes || null,
+      `INSERT INTO documents (doc_type, client_id, client_name, order_id, amount, vat_included, status, notes, valid_until, due_date, ship_date, sign_date, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      [docType, clientId || null, clientName || null, orderId || null, amount, !!vatIncluded, status || 'draft', notes || null,
        validUntil || null, dueDate || null, shipDate || null, signDate || null, req.userId]
     );
     await insertItems(client, rows[0].id, items);
@@ -97,14 +111,14 @@ router.put('/:id', async (req, res, next) => {
 
   const client = await pool.connect();
   try {
-    const { docType, clientId, clientName, orderId, items = [], notes, status, validUntil, dueDate, shipDate, signDate } = req.body;
-    const amount = items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.price) || 0), 0);
+    const { docType, clientId, clientName, orderId, items = [], notes, status, validUntil, dueDate, shipDate, signDate, vatIncluded } = req.body;
+    const amount = computeAmount(items, !!vatIncluded);
     await client.query('BEGIN');
     const { rows } = await client.query(
-      `UPDATE documents SET doc_type=$1, client_id=$2, client_name=$3, order_id=$4, amount=$5, status=$6, notes=$7,
+      `UPDATE documents SET doc_type=$1, client_id=$2, client_name=$3, order_id=$4, amount=$5, vat_included=$13, status=$6, notes=$7,
         valid_until=$8, due_date=$9, ship_date=$10, sign_date=$11 WHERE id=$12 RETURNING *`,
       [docType, clientId || null, clientName || null, orderId || null, amount, status || 'draft', notes || null,
-       validUntil || null, dueDate || null, shipDate || null, signDate || null, req.params.id]
+       validUntil || null, dueDate || null, shipDate || null, signDate || null, req.params.id, !!vatIncluded]
     );
     if (!rows[0]) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Документ не найден' }); }
     await client.query('DELETE FROM document_items WHERE document_id=$1', [req.params.id]);

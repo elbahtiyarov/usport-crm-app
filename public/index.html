@@ -661,6 +661,7 @@
   let messagesPollTimer = null, unreadPollTimer = null;
   let productSearch = '', clientSearch = '';
   let modalItems = [];
+  let modalVatIncluded = false;
   let currentUser = null;
 
   // ---------- API layer ----------
@@ -938,7 +939,7 @@
 
     wrap.innerHTML = list.length === 0 ? `<div class="empty-state">${q ? 'Ничего не найдено.' : 'Товаров пока нет. Добавьте первый через кнопку выше.'}</div>` : `
         <table>
-          <thead><tr><th></th><th>Артикул</th><th>Наименование</th><th>Категория</th><th>Цена</th><th>Вес</th><th>Объём</th><th>Характеристики</th><th>Автор</th><th></th></tr></thead>
+          <thead><tr><th></th><th>Артикул</th><th>Наименование</th><th>Категория</th><th>Цена</th><th>Дилер</th><th>Опт</th><th>С НДС</th><th>Вес</th><th>Объём</th><th>Характеристики</th><th>Автор</th><th></th></tr></thead>
           <tbody>
             ${list.map(p => `
               <tr>
@@ -947,6 +948,9 @@
                 <td class="cell-name">${escapeHtml(p.name)}</td>
                 <td>${escapeHtml(p.category||'—')}</td>
                 <td>${fmt(p.price)}</td>
+                <td style="color:var(--ink-soft);font-size:13px;">${p.dealerPrice ? fmt(p.dealerPrice) : '—'}</td>
+                <td style="color:var(--ink-soft);font-size:13px;">${p.wholesalePrice ? fmt(p.wholesalePrice) : '—'}</td>
+                <td style="color:var(--ink-soft);font-size:13px;">${p.priceWithVat ? fmt(p.priceWithVat) + (p.vatRate!=null ? ` (${p.vatRate}%)` : '') : '—'}</td>
                 <td style="color:var(--ink-soft);font-size:13px;">${p.weight ? p.weight + ' кг' : '—'}</td>
                 <td style="color:var(--ink-soft);font-size:13px;">${p.volume ? p.volume + ' м³' : '—'}</td>
                 <td style="max-width:200px;color:var(--ink-soft);font-size:13px;">${escapeHtml(p.specs||'—')}</td>
@@ -1000,7 +1004,11 @@
       <div class="field"><label>Наименование</label><input id="f_name" type="text" value="${escapeHtml(product?.name||'')}" placeholder="Кроссовки для бега Air Runner"></div>
       <div class="field-row">
         <div class="field"><label>Цена, ₸</label><input id="f_price" type="number" min="0" value="${product?.price||''}" placeholder="32900"></div>
-        <div class="field"><label>Цена с НДС, ₸</label><input id="f_priceWithVat" type="number" min="0" value="${product?.priceWithVat||''}" placeholder="необязательно"></div>
+        <div class="field">
+          <label>НДС, %</label>
+          <input id="f_vatRate" type="number" min="0" step="0.1" value="${product?.vatRate!=null?product.vatRate:16}" placeholder="16">
+          <div id="vatPreview" style="font-size:12px;color:var(--ink-soft);margin-top:4px;"></div>
+        </div>
       </div>
       <div class="field-row">
         <div class="field"><label>Дилерская цена, ₸</label><input id="f_dealerPrice" type="number" min="0" value="${product?.dealerPrice||''}" placeholder="необязательно"></div>
@@ -1030,7 +1038,7 @@
       const data = {
         sku: getVal('f_sku').trim(), category: getVal('f_category'), name,
         price: Number(getVal('f_price') || 0),
-        priceWithVat: getVal('f_priceWithVat') ? Number(getVal('f_priceWithVat')) : null,
+        vatRate: getVal('f_vatRate') !== '' ? Number(getVal('f_vatRate')) : null,
         dealerPrice: getVal('f_dealerPrice') ? Number(getVal('f_dealerPrice')) : null,
         wholesalePrice: getVal('f_wholesalePrice') ? Number(getVal('f_wholesalePrice')) : null,
         weight: getVal('f_weight') ? Number(getVal('f_weight')) : null,
@@ -1040,6 +1048,18 @@
       if (isEdit) await updateDoc('products', product.id, data); else await addDoc('products', data);
       closeModal();
     });
+
+    function updateVatPreview(){
+      const price = Number(getVal('f_price')) || 0;
+      const vat = getVal('f_vatRate') !== '' ? Number(getVal('f_vatRate')) : null;
+      const preview = document.getElementById('vatPreview');
+      if (!price || vat == null) { preview.textContent = ''; return; }
+      const withVat = Math.round(price * (1 + vat / 100) * 100) / 100;
+      preview.textContent = `Цена с НДС: ${fmt(withVat)}`;
+    }
+    document.getElementById('f_price').addEventListener('input', updateVatPreview);
+    document.getElementById('f_vatRate').addEventListener('input', updateVatPreview);
+    updateVatPreview();
 
     document.getElementById('productPhotoInput').addEventListener('change', e => {
       const file = e.target.files[0];
@@ -1173,8 +1193,13 @@
   }
 
   // ---------- Shared item-row builder ----------
+  const VAT_RATE = 16; // стандартная ставка НДС в Казахстане с 1 января 2026
   function computeItemSum(it){ return (Number(it.qty)||0) * (Number(it.price)||0); }
-  function computeModalTotal(){ return modalItems.reduce((s, it) => s + computeItemSum(it), 0); }
+  function computeModalBaseTotal(){ return modalItems.reduce((s, it) => s + computeItemSum(it), 0); }
+  function computeModalTotal(){
+    const base = computeModalBaseTotal();
+    return modalVatIncluded ? Math.round(base * (1 + VAT_RATE / 100) * 100) / 100 : base;
+  }
 
   function itemsRowsHtml(){
     if (modalItems.length === 0) return '<div class="kanban-empty">Позиций пока нет</div>';
@@ -1209,6 +1234,18 @@
       const w = computeModalTotalWeight(), v = computeModalTotalVolume();
       dims.style.display = (w || v) ? '' : 'none';
       dims.textContent = `Вес: ${w ? w.toFixed(2) : 0} кг · Объём: ${v ? v.toFixed(3) : 0} м³`;
+    }
+    const breakdown = document.getElementById('vatBreakdown');
+    if (breakdown) {
+      if (modalVatIncluded) {
+        const base = computeModalBaseTotal();
+        const total = computeModalTotal();
+        const vatAmount = Math.round((total - base) * 100) / 100;
+        breakdown.style.display = '';
+        breakdown.innerHTML = `Без НДС: ${fmt(base)} · НДС ${VAT_RATE}%: ${fmt(vatAmount)}`;
+      } else {
+        breakdown.style.display = 'none';
+      }
     }
   }
 
@@ -1256,6 +1293,11 @@
         </div>
         <div id="itemsRows" class="items-rows" style="margin-top:10px;">${itemsRowsHtml()}</div>
         <div id="modalDimensions" style="display:none;font-size:12.5px;color:var(--ink-soft);margin-top:8px;"></div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13.5px;cursor:pointer;">
+          <input type="checkbox" id="vatIncludedCheckbox" ${modalVatIncluded?'checked':''} style="width:auto;">
+          Учитывать НДС (${VAT_RATE}%) в итоге
+        </label>
+        <div id="vatBreakdown" style="display:none;font-size:12.5px;color:var(--ink-soft);margin-top:4px;"></div>
       </div>
     `;
   }
@@ -1263,6 +1305,11 @@
   function bindItemsBlock(){
     bindItemsRows();
     updateModalTotalDisplay();
+
+    document.getElementById('vatIncludedCheckbox').addEventListener('change', e => {
+      modalVatIncluded = e.target.checked;
+      updateModalTotalDisplay();
+    });
 
     const searchInput = document.getElementById('catalogSearch');
     const catalogPick = document.getElementById('catalogPick');
@@ -1338,7 +1385,7 @@
             <div class="dc-items">${(o.items||[]).slice(0,2).map(it => escapeHtml(it.name)).join(', ')}${(o.items||[]).length>2 ? ` и ещё ${o.items.length-2}` : ''}</div>
             ${o.createdByEmail ? `<div class="dc-items" style="opacity:0.75;">${escapeHtml(o.createdByEmail)}</div>` : ''}
             ${o.approvedByEmail ? `<div class="dc-items" style="opacity:0.75;color:var(--green);">✓ Подтвердил: ${escapeHtml(o.approvedByEmail)}</div>` : ''}
-            <div class="dc-amount">${fmt(o.amount)}</div>
+            <div class="dc-amount">${fmt(o.amount)}${o.vatIncluded ? ' <span style="font-size:10.5px;font-weight:600;color:var(--ink-soft);">с НДС</span>' : ''}</div>
             <div class="dc-actions">
               ${canEdit(o) ? `
                 <div class="dc-move">
@@ -1378,6 +1425,7 @@
   function openOrderModal(order){
     const isEdit = !!order;
     modalItems = order ? JSON.parse(JSON.stringify(order.items||[])) : [];
+    modalVatIncluded = order ? !!order.vatIncluded : false;
     renderModal(`
       <h3>${isEdit ? 'Изменить заказ' : 'Новый заказ'}</h3>
       <div class="field"><label>Клиент</label>
@@ -1390,7 +1438,7 @@
       const clientId = getVal('f_client');
       const client = clients.find(c => c.id === clientId);
       const items = modalItems.filter(it => (it.name||'').trim() !== '').map(it => ({ name: it.name.trim(), qty: Number(it.qty)||0, price: Number(it.price)||0, sku: it.sku||'', photoUrl: it.photoUrl||'', weight: it.weight||null, volume: it.volume||null, dealerPrice: it.dealerPrice||null, wholesalePrice: it.wholesalePrice||null, priceWithVat: it.priceWithVat||null }));
-      const data = { clientId: clientId || null, clientName: client ? client.name : 'Без клиента', items, stage: getVal('f_stage') };
+      const data = { clientId: clientId || null, clientName: client ? client.name : 'Без клиента', items, stage: getVal('f_stage'), vatIncluded: modalVatIncluded };
       if (isEdit) await updateDoc('orders', order.id, data); else await addDoc('orders', data);
       closeModal();
     });
@@ -1466,6 +1514,7 @@
     const isEdit = !!doc;
     let modalDocType = doc ? doc.docType : 'kp';
     modalItems = doc ? JSON.parse(JSON.stringify(doc.items||[])) : (presetOrder ? JSON.parse(JSON.stringify(presetOrder.items||[])) : []);
+    modalVatIncluded = doc ? !!doc.vatIncluded : (presetOrder ? !!presetOrder.vatIncluded : false);
     const presetClientId = doc ? doc.clientId : (presetOrder ? presetOrder.clientId : '');
     const presetOrderId = doc ? doc.orderId : (presetOrder ? presetOrder.id : null);
 
@@ -1489,7 +1538,7 @@
       if (items.length === 0 && type !== 'contract') return alert('Добавьте хотя бы одну позицию');
       const data = {
         docType: type, clientId: clientId || null, clientName: client ? client.name : 'Без клиента', orderId: presetOrderId,
-        items, notes: getVal('f_notes').trim(), status: getVal('f_status'),
+        items, notes: getVal('f_notes').trim(), status: getVal('f_status'), vatIncluded: modalVatIncluded,
         validUntil: getVal('f_validUntil'), dueDate: getVal('f_dueDate'), shipDate: getVal('f_shipDate'), signDate: getVal('f_signDate')
       };
       if (isEdit) await updateDoc('documents', doc.id, data); else await addDoc('documents', data);
@@ -1535,9 +1584,12 @@
     const totalVolume = (doc.items||[]).reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.volume)||0), 0);
     const dimsLine = (totalWeight || totalVolume)
       ? `<p style="font-size:11.5px;color:#666;margin-top:-6px;">Габариты: вес ${totalWeight.toFixed(2)} кг · объём ${totalVolume.toFixed(3)} м³</p>` : '';
+    const vatLine = doc.vatIncluded
+      ? `<p style="font-size:11.5px;color:#666;margin-top:-6px;">Без НДС: ${fmt(doc.baseAmount)} · НДС ${doc.vatRate||16}%: ${fmt(doc.vatAmount)}</p>` : '';
     const itemsTable = (doc.items||[]).length ? `
       <table class="kp-table"><thead><tr>${photoTh}<th>№</th><th class="kp-sku-th">Артикул</th><th>Наименование</th><th class="kp-qty-th">Кол-во</th><th class="kp-price-th">Цена</th>${extraTh}<th class="kp-sum-th">Сумма</th></tr></thead>
-      <tbody>${rowsHtml}</tbody><tfoot><tr><td colspan="${totalCols}">Итого</td><td>${fmt(doc.amount)}</td></tr></tfoot></table>
+      <tbody>${rowsHtml}</tbody><tfoot><tr><td colspan="${totalCols}">Итого${doc.vatIncluded?' (с НДС)':''}</td><td>${fmt(doc.amount)}</td></tr></tfoot></table>
+      ${vatLine}
       ${dimsLine}` : '';
 
     let extraLine = '';

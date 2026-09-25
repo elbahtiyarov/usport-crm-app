@@ -192,3 +192,20 @@ ALTER TABLE document_items ADD COLUMN IF NOT EXISTS dealer_price NUMERIC(12,2);
 ALTER TABLE document_items ADD COLUMN IF NOT EXISTS wholesale_price NUMERIC(12,2);
 ALTER TABLE document_items ADD COLUMN IF NOT EXISTS price_with_vat NUMERIC(12,2);
 
+-- Ставка НДС (%) у товара — цена с НДС теперь СЧИТАЕТСЯ от неё
+-- (price * (1 + vat_rate/100)), а не вводится вручную.
+-- 16 — стандартная ставка НДС в Казахстане с 1 января 2026 (новый
+-- Налоговый кодекс; раньше было 12%).
+ALTER TABLE products ADD COLUMN IF NOT EXISTS vat_rate NUMERIC(5,2) DEFAULT 16;
+-- Если база уже была мигрирована раньше со старым дефолтом (12%) —
+-- подтягиваем сам дефолт колонки и уже проставленные 12% до новых 16%.
+ALTER TABLE products ALTER COLUMN vat_rate SET DEFAULT 16;
+UPDATE products SET vat_rate = 16, price_with_vat = ROUND(price * 1.16, 2)
+  WHERE vat_rate = 12 AND price IS NOT NULL;
+
+-- Общая галочка "Учитывать НДС (16%)" на весь заказ/документ — если
+-- включена, amount хранит ИТОГО с НДС (сумма позиций × 1.16), а в
+-- интерфейсе/печати/PDF показывается разбивка: без НДС / НДС / итого.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS vat_included BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS vat_included BOOLEAN NOT NULL DEFAULT false;
+

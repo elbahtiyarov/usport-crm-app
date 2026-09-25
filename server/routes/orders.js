@@ -3,13 +3,27 @@ const router = express.Router();
 const pool = require('../db');
 const { assertOwnership } = require('../ownership');
 
+const VAT_RATE = 16; // стандартная ставка НДС в Казахстане с 1 января 2026
+
+function computeAmount(items, vatIncluded) {
+  const base = items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.price) || 0), 0);
+  return vatIncluded ? Math.round(base * (1 + VAT_RATE / 100) * 100) / 100 : base;
+}
+
 function mapOrder(r) {
+  const amount = Number(r.amount);
+  const vatIncluded = !!r.vat_included;
+  const baseAmount = vatIncluded ? Math.round((amount / (1 + VAT_RATE / 100)) * 100) / 100 : amount;
   return {
     id: String(r.id),
     clientId: r.client_id != null ? String(r.client_id) : null,
     clientName: r.client_name || '',
     stage: r.stage,
-    amount: Number(r.amount),
+    amount,
+    vatIncluded,
+    vatRate: VAT_RATE,
+    baseAmount,
+    vatAmount: vatIncluded ? Math.round((amount - baseAmount) * 100) / 100 : 0,
     items: Array.isArray(r.items) ? r.items : [],
     createdAt: new Date(r.created_at).getTime(),
     createdBy: r.created_by != null ? String(r.created_by) : null,
@@ -61,12 +75,12 @@ async function insertItems(client, orderId, items) {
 router.post('/', async (req, res, next) => {
   const client = await pool.connect();
   try {
-    const { clientId, clientName, items = [], stage } = req.body;
-    const amount = items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.price) || 0), 0);
+    const { clientId, clientName, items = [], stage, vatIncluded } = req.body;
+    const amount = computeAmount(items, !!vatIncluded);
     await client.query('BEGIN');
     const { rows } = await client.query(
-      `INSERT INTO orders (client_id, client_name, stage, amount, created_by) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [clientId || null, clientName || null, stage || 'request', amount, req.userId]
+      `INSERT INTO orders (client_id, client_name, stage, amount, vat_included, created_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [clientId || null, clientName || null, stage || 'request', amount, !!vatIncluded, req.userId]
     );
     await insertItems(client, rows[0].id, items);
     await client.query('COMMIT');
@@ -94,18 +108,18 @@ router.put('/:id', async (req, res, next) => {
 
   const client = await pool.connect();
   try {
-    const { clientId, clientName, items = [] } = req.body;
-    const amount = items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.price) || 0), 0);
+    const { clientId, clientName, items = [], vatIncluded } = req.body;
+    const amount = computeAmount(items, !!vatIncluded);
     const approve = isApprovalStep(currentStage, nextStage);
     const resetApproval = nextStage === 'approval' && currentStage !== 'approval';
 
     await client.query('BEGIN');
     const { rows } = await client.query(
-      `UPDATE orders SET client_id=$1, client_name=$2, stage=$3, amount=$4,
+      `UPDATE orders SET client_id=$1, client_name=$2, stage=$3, amount=$4, vat_included=$9,
          approved_by = CASE WHEN $6 THEN $7 WHEN $8 THEN NULL ELSE approved_by END,
          approved_at = CASE WHEN $6 THEN now() WHEN $8 THEN NULL ELSE approved_at END
        WHERE id=$5 RETURNING *`,
-      [clientId || null, clientName || null, nextStage, amount, req.params.id, approve, req.userId, resetApproval]
+      [clientId || null, clientName || null, nextStage, amount, req.params.id, approve, req.userId, resetApproval, !!vatIncluded]
     );
     if (!rows[0]) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Заказ не найден' }); }
     await client.query('DELETE FROM order_items WHERE order_id=$1', [req.params.id]);

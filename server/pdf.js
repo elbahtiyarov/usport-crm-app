@@ -141,7 +141,7 @@ function generateDocumentPdf({ doc, client, settings }) {
       const priceW = priceColsCount > 1 ? 50 : 72;
       const sumW = priceColsCount > 1 ? 68 : 82;
       const skuW = priceColsCount > 2 ? 58 : 62;
-      const colQty = 40;
+      const colQty = 46;
       const colPhoto = hasPhotos ? 30 : 0;
       const colName = contentWidth - colPhoto - skuW - colQty - priceW * priceColsCount - sumW;
 
@@ -224,11 +224,18 @@ function generateDocumentPdf({ doc, client, settings }) {
         const totalY = pdf.y + 4;
         pdf.moveTo(left, totalY).lineTo(right, totalY).lineWidth(1.5).strokeColor(NAVY).stroke();
         pdf.font('bold').fontSize(11).fillColor(NAVY)
-          .text('Итого', colX(cols.length - 2) - 100, totalY + 6, { width: 100, align: 'right' });
+          .text(doc.vatIncluded ? 'Итого (с НДС)' : 'Итого', colX(cols.length - 2) - 100, totalY + 6, { width: 100, align: 'right' });
         pdf.font('bold').fontSize(priceColsCount > 1 ? 9.5 : 11).fillColor(NAVY)
           .text(fmt(doc.amount), colX(cols.length - 1) + 6, totalY + 6, { width: cols[cols.length - 1].w - 10, align: 'right', lineBreak: false });
         pdf.x = left;
         pdf.y = totalY + 26;
+
+        if (doc.vatIncluded) {
+          pdf.font('regular').fontSize(9).fillColor(SOFT)
+            .text(`Без НДС: ${fmt(doc.baseAmount)} · НДС ${doc.vatRate||16}%: ${fmt(doc.vatAmount)}`, left, pdf.y, { width: contentWidth });
+          pdf.x = left;
+          pdf.moveDown(0.5);
+        }
 
         const totalWeight = items.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.weight)||0), 0);
         const totalVolume = items.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.volume)||0), 0);
