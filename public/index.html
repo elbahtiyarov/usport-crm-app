@@ -1514,6 +1514,7 @@
                 <td><div class="row-actions">
                   <button class="btn-ghost-sm" data-print="${d.id}">Печать</button>
                   <a class="btn-ghost-sm" href="/api/documents/${d.id}/pdf" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">Скачать PDF</a>
+                  <button class="btn-ghost-sm" data-copy="${d.id}" title="Создать новый документ на основе этого">Копировать</button>
                   ${canEdit(d) ? `
                     <button class="btn-ghost-sm" data-edit="${d.id}">Изменить</button>
                     <button class="btn-danger-sm" data-del="${d.id}">Удалить</button>
@@ -1529,6 +1530,7 @@
     el.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openDocumentModal(documents.find(d => d.id === b.dataset.edit))));
     el.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => { if (confirm('Удалить документ?')) deleteDoc('documents', b.dataset.del); }));
     el.querySelectorAll('[data-print]').forEach(b => b.addEventListener('click', () => printDocument(documents.find(d => d.id === b.dataset.print))));
+    el.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => openDocumentModal(null, null, documents.find(d => d.id === b.dataset.copy))));
   }
 
   function contractTemplate(clientName, amount){
@@ -1632,25 +1634,28 @@
     return '';
   }
 
-  function openDocumentModal(doc, presetOrder){
+  function openDocumentModal(doc, presetOrder, copyFrom){
     const isEdit = !!doc;
-    let modalDocType = doc ? doc.docType : 'kp';
-    modalItems = doc ? JSON.parse(JSON.stringify(doc.items||[])) : (presetOrder ? JSON.parse(JSON.stringify(presetOrder.items||[])) : []);
-    modalVatIncluded = doc ? !!doc.vatIncluded : (presetOrder ? !!presetOrder.vatIncluded : false);
-    const presetClientId = doc ? doc.clientId : (presetOrder ? presetOrder.clientId : '');
-    const presetOrderId = doc ? doc.orderId : (presetOrder ? presetOrder.id : null);
+    const source = doc || copyFrom || null;
+    let modalDocType = source ? source.docType : 'kp';
+    modalItems = source ? JSON.parse(JSON.stringify(source.items||[])) : (presetOrder ? JSON.parse(JSON.stringify(presetOrder.items||[])) : []);
+    modalVatIncluded = source ? !!source.vatIncluded : (presetOrder ? !!presetOrder.vatIncluded : false);
+    const presetClientId = source ? source.clientId : (presetOrder ? presetOrder.clientId : '');
+    const presetOrderId = doc ? doc.orderId : (presetOrder ? presetOrder.id : (copyFrom ? copyFrom.orderId : null));
+    const defaultStatus = isEdit ? doc.status : 'draft';
 
     renderModal(`
-      <h3>${isEdit ? 'Изменить документ' : 'Новый документ'}</h3>
+      <h3>${isEdit ? 'Изменить документ' : (copyFrom ? 'Копия документа' : 'Новый документ')}</h3>
+      ${copyFrom ? `<div class="field-hint" style="font-size:12.5px;color:var(--ink-soft);margin:-4px 0 10px;">Копия документа №${copyFrom.docNumber||copyFrom.id} — проверьте данные и сохраните как новый.</div>` : ''}
       <div class="field"><label>Тип документа</label><select id="f_doctype">${DOC_TYPES.map(t => `<option value="${t.id}" ${modalDocType===t.id?'selected':''}>${t.label}</option>`).join('')}</select></div>
       <div class="field"><label>Клиент</label><select id="f_client"><option value="">— выбрать клиента —</option>${clients.map(c => `<option value="${c.id}" ${presetClientId===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}</select></div>
       ${renderItemsBlock()}
-      <div id="typeExtra">${renderTypeExtra(modalDocType, doc)}</div>
+      <div id="typeExtra">${renderTypeExtra(modalDocType, source)}</div>
       <div class="field">
         <label>Комментарий / условия <button type="button" class="btn-ghost-sm" id="insertTemplateBtn" style="margin-left:8px;display:${modalDocType==='contract'?'inline-flex':'none'};">Вставить типовой текст</button></label>
-        <textarea id="f_notes" style="${modalDocType==='contract'?'min-height:180px;':''}" placeholder="Предоплата 50%, доставка за счёт покупателя...">${escapeHtml(doc?.notes||'')}</textarea>
+        <textarea id="f_notes" style="${modalDocType==='contract'?'min-height:180px;':''}" placeholder="Предоплата 50%, доставка за счёт покупателя...">${escapeHtml(source?.notes||'')}</textarea>
       </div>
-      <div class="field"><label>Статус</label><select id="f_status">${DOC_STATUSES.map(s => `<option value="${s.id}" ${doc?.status===s.id?'selected':''}>${s.label}</option>`).join('')}</select></div>
+      <div class="field"><label>Статус</label><select id="f_status">${DOC_STATUSES.map(s => `<option value="${s.id}" ${defaultStatus===s.id?'selected':''}>${s.label}</option>`).join('')}</select></div>
       <div class="kp-total-row"><span>Итого</span><span id="modalTotal" class="display" style="font-size:20px;">${fmt(computeModalTotal())}</span></div>
     `, async () => {
       const type = getVal('f_doctype');
@@ -1671,7 +1676,7 @@
 
     document.getElementById('f_doctype').addEventListener('change', e => {
       modalDocType = e.target.value;
-      document.getElementById('typeExtra').innerHTML = renderTypeExtra(modalDocType, doc);
+      document.getElementById('typeExtra').innerHTML = renderTypeExtra(modalDocType, source);
       document.getElementById('insertTemplateBtn').style.display = modalDocType === 'contract' ? 'inline-flex' : 'none';
     });
     document.getElementById('insertTemplateBtn').addEventListener('click', () => {
