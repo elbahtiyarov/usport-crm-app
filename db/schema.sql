@@ -213,3 +213,10 @@ ALTER TABLE documents ADD COLUMN IF NOT EXISTS vat_included BOOLEAN NOT NULL DEF
 -- вступительной части типового текста договора поставки.
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS license_number TEXT;
 
+-- Единица измерения товара (шт, м, м², м³, кг, компл. и т.п.) — переносится
+-- в позицию заказа/документа при добавлении из каталога (как sku/photo_url)
+-- и отражается в печатной форме и PDF рядом с количеством.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT 'шт';
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT 'шт';
+ALTER TABLE document_items ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT 'шт';
+

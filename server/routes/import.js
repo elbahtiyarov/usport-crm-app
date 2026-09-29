@@ -54,15 +54,16 @@ async function upsertProducts(rows, userId) {
            specs = COALESCE(NULLIF($5, ''), specs),
            photo_url = COALESCE(photo_url, $6),
            weight = COALESCE($8, weight),
-           volume = COALESCE($9, volume)
+           volume = COALESCE($9, volume),
+           unit = COALESCE(NULLIF($10, ''), unit)
          WHERE id = $7`,
-        [r.sku || '', r.name, r.category || '', r.price, r.specs || '', r.photoUrl || null, match.id, r.weight || null, r.volume || null]
+        [r.sku || '', r.name, r.category || '', r.price, r.specs || '', r.photoUrl || null, match.id, r.weight || null, r.volume || null, r.unit || '']
       );
       updated++;
     } else {
       await pool.query(
-        `INSERT INTO products (sku, name, category, price, specs, photo_url, weight, volume, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [r.sku || null, r.name, r.category || null, r.price, r.specs || null, r.photoUrl || null, r.weight || null, r.volume || null, userId]
+        `INSERT INTO products (sku, name, category, price, specs, photo_url, weight, volume, unit, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [r.sku || null, r.name, r.category || null, r.price, r.specs || null, r.photoUrl || null, r.weight || null, r.volume || null, r.unit || 'шт', userId]
       );
       inserted++;
     }
@@ -121,10 +122,10 @@ router.post('/documents', upload.single('file'), async (req, res, next) => {
             catch (e) { console.error('Не удалось сохранить картинку позиции из Excel:', e.message); }
           }
           await client.query(
-            `INSERT INTO document_items (document_id, sku, name, qty, price, photo_url) VALUES ($1,$2,$3,$4,$5,$6)`,
-            [rows[0].id, it.sku || null, it.name, it.qty, it.price, photoUrl]
+            `INSERT INTO document_items (document_id, sku, name, qty, price, photo_url, unit) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+            [rows[0].id, it.sku || null, it.name, it.qty, it.price, photoUrl, it.unit || 'шт']
           );
-          productCandidates.push({ sku: it.sku, name: it.name, price: it.price, photoUrl });
+          productCandidates.push({ sku: it.sku, name: it.name, price: it.price, photoUrl, unit: it.unit });
         }
         await client.query('COMMIT');
         created++;

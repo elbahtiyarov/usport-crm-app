@@ -187,7 +187,7 @@
   #catalogSearch:focus { outline: 2px solid var(--navy-dim); outline-offset: 1px; }
   #catalogPick:focus { outline: 2px solid var(--navy-dim); outline-offset: 1px; }
   .items-rows { display: flex; flex-direction: column; gap: 6px; }
-  .item-row { display: grid; grid-template-columns: 34px 1fr 46px 84px 84px 20px; gap: 6px; align-items: center; }
+  .item-row { display: grid; grid-template-columns: 34px 1fr 46px 56px 84px 84px 20px; gap: 6px; align-items: center; }
   .item-row input { padding: 7px 8px; font-size: 13px; }
   .it-sum { font-size: 13px; text-align: right; color: var(--ink-soft); }
   .it-remove { background: none; border: none; color: var(--ink-soft); font-size: 15px; line-height: 1; padding: 4px; }
@@ -418,7 +418,7 @@
     .kp-num-td { width: 34px; color: #888; }
     .kp-sku-th, .kp-sku-td { width: 90px; }
     .kp-sku-td { color: #666; font-family: 'Barlow Condensed', Arial, sans-serif; font-weight: 600; letter-spacing: 0.02em; }
-    .kp-qty-th, .kp-qty-td { text-align: center; width: 80px; white-space: nowrap; }
+    .kp-qty-th, .kp-qty-td { text-align: center; width: 92px; white-space: nowrap; }
     .kp-price-th, .kp-price-td { text-align: right; width: 72px; white-space: nowrap; }
     .kp-sum-th, .kp-sum-td { text-align: right; width: 88px; white-space: nowrap; }
     .kp-item-photo { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; display: block; }
@@ -944,7 +944,7 @@
 
     wrap.innerHTML = list.length === 0 ? `<div class="empty-state">${q ? 'Ничего не найдено.' : 'Товаров пока нет. Добавьте первый через кнопку выше.'}</div>` : `
         <table>
-          <thead><tr><th></th><th>Артикул</th><th>Наименование</th><th>Категория</th><th>Цена</th><th>Дилер</th><th>Опт</th><th>С НДС</th><th>Вес</th><th>Объём</th><th>Характеристики</th><th>Автор</th><th></th></tr></thead>
+          <thead><tr><th></th><th>Артикул</th><th>Наименование</th><th>Категория</th><th>Ед.</th><th>Цена</th><th>Дилер</th><th>Опт</th><th>С НДС</th><th>Вес</th><th>Объём</th><th>Характеристики</th><th>Автор</th><th></th></tr></thead>
           <tbody>
             ${list.map(p => `
               <tr>
@@ -952,6 +952,7 @@
                 <td class="mono">${escapeHtml(p.sku||'—')}</td>
                 <td class="cell-name">${escapeHtml(p.name)}</td>
                 <td>${escapeHtml(p.category||'—')}</td>
+                <td style="color:var(--ink-soft);font-size:13px;">${escapeHtml(p.unit||'шт')}</td>
                 <td>${fmt(p.price)}</td>
                 <td style="color:var(--ink-soft);font-size:13px;">${p.dealerPrice ? fmt(p.dealerPrice) : '—'}</td>
                 <td style="color:var(--ink-soft);font-size:13px;">${p.wholesalePrice ? fmt(p.wholesalePrice) : '—'}</td>
@@ -1023,6 +1024,14 @@
         <div class="field"><label>Вес, кг</label><input id="f_weight" type="number" min="0" step="0.001" value="${product?.weight||''}" placeholder="необязательно"></div>
         <div class="field"><label>Объём, м³</label><input id="f_volume" type="number" min="0" step="0.0001" value="${product?.volume||''}" placeholder="необязательно"></div>
       </div>
+      <div class="field">
+        <label>Единица измерения</label>
+        <input id="f_unit" type="text" list="unitOptions" value="${escapeHtml(product?.unit || 'шт')}" placeholder="шт">
+        <datalist id="unitOptions">
+          <option value="шт"><option value="компл."><option value="пара"><option value="м">
+          <option value="м²"><option value="м³"><option value="кг"><option value="упак."><option value="рулон">
+        </datalist>
+      </div>
       <div class="field"><label>Характеристики</label><textarea id="f_specs" placeholder="Размеры 38–45, сетка + резина, вес 280г">${escapeHtml(product?.specs||'')}</textarea></div>
     `, async () => {
       const name = getVal('f_name').trim();
@@ -1048,6 +1057,7 @@
         wholesalePrice: getVal('f_wholesalePrice') ? Number(getVal('f_wholesalePrice')) : null,
         weight: getVal('f_weight') ? Number(getVal('f_weight')) : null,
         volume: getVal('f_volume') ? Number(getVal('f_volume')) : null,
+        unit: getVal('f_unit').trim() || 'шт',
         specs: getVal('f_specs').trim(), photoUrl
       };
       if (isEdit) await updateDoc('products', product.id, data); else await addDoc('products', data);
@@ -1219,11 +1229,16 @@
         </div>
         <input type="text" class="it-name" value="${escapeHtml(it.name)}" placeholder="Название позиции">
         <input type="number" min="1" class="it-qty" value="${it.qty}">
+        <input type="text" class="it-unit" list="unitOptions" value="${escapeHtml(it.unit || 'шт')}" title="Единица измерения">
         <input type="number" min="0" class="it-price" value="${it.price}">
         <div class="it-sum">${fmt(computeItemSum(it))}</div>
         <button type="button" class="it-remove" data-remove="${idx}" title="Удалить">✕</button>
       </div>
-    `).join('');
+    `).join('') + `
+      <datalist id="unitOptions">
+        <option value="шт"><option value="компл."><option value="пара"><option value="м">
+        <option value="м²"><option value="м³"><option value="кг"><option value="упак."><option value="рулон">
+      </datalist>`;
   }
   function bindItemsRows(){
     const container = document.getElementById('itemsRows');
@@ -1232,6 +1247,7 @@
       row.querySelector('.it-name').addEventListener('input', e => { modalItems[idx].name = e.target.value; });
       row.querySelector('.it-qty').addEventListener('input', e => { modalItems[idx].qty = e.target.value; row.querySelector('.it-sum').textContent = fmt(computeItemSum(modalItems[idx])); updateModalTotalDisplay(); });
       row.querySelector('.it-price').addEventListener('input', e => { modalItems[idx].price = e.target.value; row.querySelector('.it-sum').textContent = fmt(computeItemSum(modalItems[idx])); updateModalTotalDisplay(); });
+      row.querySelector('.it-unit').addEventListener('input', e => { modalItems[idx].unit = e.target.value; });
       row.querySelector('.it-remove').addEventListener('click', () => { modalItems.splice(idx, 1); rerenderItemRows(); });
       const photoInput = row.querySelector('.it-photo-input');
       photoInput.addEventListener('change', async e => {
@@ -1392,7 +1408,7 @@
       const chosenPrice = p[priceTypeSelect.value] != null ? p[priceTypeSelect.value] : p.price;
       modalItems.push({
         name: p.name, qty: 1, price: chosenPrice, sku: p.sku||'', photoUrl: p.photoUrl||'',
-        weight: p.weight||null, volume: p.volume||null,
+        weight: p.weight||null, volume: p.volume||null, unit: p.unit||'шт',
         dealerPrice: p.dealerPrice||null, wholesalePrice: p.wholesalePrice||null, priceWithVat: p.priceWithVat||null
       });
       rerenderItemRows();
@@ -1469,7 +1485,7 @@
     `, async () => {
       const clientId = getVal('f_client');
       const client = clients.find(c => c.id === clientId);
-      const items = modalItems.filter(it => (it.name||'').trim() !== '').map(it => ({ name: it.name.trim(), qty: Number(it.qty)||0, price: Number(it.price)||0, sku: it.sku||'', photoUrl: it.photoUrl||'', weight: it.weight||null, volume: it.volume||null, dealerPrice: it.dealerPrice||null, wholesalePrice: it.wholesalePrice||null, priceWithVat: it.priceWithVat||null }));
+      const items = modalItems.filter(it => (it.name||'').trim() !== '').map(it => ({ name: it.name.trim(), qty: Number(it.qty)||0, price: Number(it.price)||0, sku: it.sku||'', photoUrl: it.photoUrl||'', weight: it.weight||null, volume: it.volume||null, unit: it.unit||'шт', dealerPrice: it.dealerPrice||null, wholesalePrice: it.wholesalePrice||null, priceWithVat: it.priceWithVat||null }));
       const data = { clientId: clientId || null, clientName: client ? client.name : 'Без клиента', items, stage: getVal('f_stage'), vatIncluded: modalVatIncluded };
       if (isEdit) await updateDoc('orders', order.id, data); else await addDoc('orders', data);
       closeModal();
@@ -1640,7 +1656,7 @@
       const type = getVal('f_doctype');
       const clientId = getVal('f_client');
       const client = clients.find(c => c.id === clientId);
-      const items = modalItems.filter(it => (it.name||'').trim() !== '').map(it => ({ name: it.name.trim(), qty: Number(it.qty)||0, price: Number(it.price)||0, sku: it.sku||'', photoUrl: it.photoUrl||'', weight: it.weight||null, volume: it.volume||null, dealerPrice: it.dealerPrice||null, wholesalePrice: it.wholesalePrice||null, priceWithVat: it.priceWithVat||null }));
+      const items = modalItems.filter(it => (it.name||'').trim() !== '').map(it => ({ name: it.name.trim(), qty: Number(it.qty)||0, price: Number(it.price)||0, sku: it.sku||'', photoUrl: it.photoUrl||'', weight: it.weight||null, volume: it.volume||null, unit: it.unit||'шт', dealerPrice: it.dealerPrice||null, wholesalePrice: it.wholesalePrice||null, priceWithVat: it.priceWithVat||null }));
       if (items.length === 0 && type !== 'contract') return alert('Добавьте хотя бы одну позицию');
       const data = {
         docType: type, clientId: clientId || null, clientName: client ? client.name : 'Без клиента', orderId: presetOrderId,
@@ -1684,7 +1700,7 @@
       const extraTd = (hasDealer?`<td class="kp-price-td">${it.dealerPrice?fmt(it.dealerPrice):'—'}</td>`:'')
         + (hasWholesale?`<td class="kp-price-td">${it.wholesalePrice?fmt(it.wholesalePrice):'—'}</td>`:'')
         + (hasVat?`<td class="kp-price-td">${it.priceWithVat?fmt(it.priceWithVat):'—'}</td>`:'');
-      return `<tr>${hasPhotos ? `<td class="kp-photo-td">${it.photoUrl ? `<img src="${it.photoUrl}" class="kp-item-photo" alt="">` : ''}</td>` : ''}<td class="kp-num-td">${i+1}</td><td class="kp-sku-td">${escapeHtml(it.sku||'—')}</td><td>${escapeHtml(it.name)}</td><td class="kp-qty-td">${it.qty}</td><td class="kp-price-td">${fmt(it.price)}</td>${extraTd}<td class="kp-sum-td">${fmt(it.qty*it.price)}</td></tr>`;
+      return `<tr>${hasPhotos ? `<td class="kp-photo-td">${it.photoUrl ? `<img src="${it.photoUrl}" class="kp-item-photo" alt="">` : ''}</td>` : ''}<td class="kp-num-td">${i+1}</td><td class="kp-sku-td">${escapeHtml(it.sku||'—')}</td><td>${escapeHtml(it.name)}</td><td class="kp-qty-td">${it.qty} ${escapeHtml(it.unit||'шт')}</td><td class="kp-price-td">${fmt(it.price)}</td>${extraTd}<td class="kp-sum-td">${fmt(it.qty*it.price)}</td></tr>`;
     }).join('');
     const totalWeight = (doc.items||[]).reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.weight)||0), 0);
     const totalVolume = (doc.items||[]).reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.volume)||0), 0);

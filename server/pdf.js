@@ -216,7 +216,7 @@ function generateDocumentPdf({ doc, client, settings }) {
       const priceW = priceColsCount > 1 ? 50 : 72;
       const sumW = priceColsCount > 1 ? 68 : 82;
       const skuW = priceColsCount > 2 ? 58 : 62;
-      const colQty = 46;
+      const colQty = 58;
       const colPhoto = hasPhotos ? 30 : 0;
       const colName = contentWidth - colPhoto - skuW - colQty - priceW * priceColsCount - sumW;
 
@@ -280,15 +280,16 @@ function generateDocumentPdf({ doc, client, settings }) {
             }
             const val = c.key === 'sku' ? (it.sku || '—')
               : c.key === 'name' ? (it.name || '')
-              : c.key === 'qty' ? String(it.qty)
+              : c.key === 'qty' ? `${it.qty} ${it.unit || 'шт'}`
               : c.key === 'price' ? fmt(it.price)
               : c.key === 'dealerPrice' ? (it.dealerPrice ? fmt(it.dealerPrice) : '—')
               : c.key === 'wholesalePrice' ? (it.wholesalePrice ? fmt(it.wholesalePrice) : '—')
               : c.key === 'priceWithVat' ? (it.priceWithVat ? fmt(it.priceWithVat) : '—')
               : fmt((Number(it.qty) || 0) * (Number(it.price) || 0));
             const isPriceCol = ['price','dealerPrice','wholesalePrice','priceWithVat','sum'].includes(c.key);
-            pdf.font(c.key === 'sku' ? 'bold' : 'regular').fontSize(isPriceCol && priceColsCount > 1 ? 8 : 9).fillColor(c.key === 'sku' ? SOFT : INK)
-              .text(val, x, rowY + 6, { width: w, align: c.align || 'left', lineBreak: isPriceCol ? false : true });
+            const noWrap = isPriceCol || c.key === 'qty';
+            pdf.font(c.key === 'sku' ? 'bold' : 'regular').fontSize(isPriceCol && priceColsCount > 1 ? 8 : (c.key === 'qty' ? 8.5 : 9)).fillColor(c.key === 'sku' ? SOFT : INK)
+              .text(val, x, rowY + 6, { width: w, align: c.align || 'left', lineBreak: noWrap ? false : true });
           });
 
           pdf.moveTo(left, rowY + rowH).lineTo(right, rowY + rowH).lineWidth(0.5).strokeColor(LINE).stroke();

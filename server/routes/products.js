@@ -23,6 +23,7 @@ function mapProduct(r) {
     priceWithVat: r.price_with_vat != null ? Number(r.price_with_vat) : null,
     weight: r.weight != null ? Number(r.weight) : null,
     volume: r.volume != null ? Number(r.volume) : null,
+    unit: r.unit || 'шт',
     specs: r.specs || '',
     photoUrl: r.photo_url || '',
     createdAt: new Date(r.created_at).getTime(),
@@ -42,15 +43,15 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const { sku, name, category, price, dealerPrice, wholesalePrice, vatRate, weight, volume, specs, photoUrl } = req.body;
+    const { sku, name, category, price, dealerPrice, wholesalePrice, vatRate, weight, volume, unit, specs, photoUrl } = req.body;
     if (!name) return res.status(400).json({ error: 'Укажите наименование товара' });
     const priceWithVat = computePriceWithVat(price, vatRate);
     const { rows } = await pool.query(
-      `INSERT INTO products (sku, name, category, price, dealer_price, wholesale_price, vat_rate, price_with_vat, weight, volume, specs, photo_url, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      `INSERT INTO products (sku, name, category, price, dealer_price, wholesale_price, vat_rate, price_with_vat, weight, volume, unit, specs, photo_url, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
       [sku || null, name, category || null, price || 0,
        dealerPrice || null, wholesalePrice || null, vatRate != null ? vatRate : null, priceWithVat,
-       weight || null, volume || null, specs || null, photoUrl || null, req.userId]
+       weight || null, volume || null, unit || 'шт', specs || null, photoUrl || null, req.userId]
     );
     res.json(mapProduct({ ...rows[0], created_by_email: req.userEmail }));
   } catch (e) { next(e); }
@@ -61,14 +62,14 @@ router.put('/:id', async (req, res, next) => {
     const denial = await assertOwnership(pool, 'products', req.params.id, req);
     if (denial) return res.status(denial.status).json({ error: denial.error });
 
-    const { sku, name, category, price, dealerPrice, wholesalePrice, vatRate, weight, volume, specs, photoUrl } = req.body;
+    const { sku, name, category, price, dealerPrice, wholesalePrice, vatRate, weight, volume, unit, specs, photoUrl } = req.body;
     const priceWithVat = computePriceWithVat(price, vatRate);
     const { rows } = await pool.query(
       `UPDATE products SET sku=$1, name=$2, category=$3, price=$4, dealer_price=$5, wholesale_price=$6,
-         vat_rate=$7, price_with_vat=$8, weight=$9, volume=$10, specs=$11, photo_url=$12 WHERE id=$13 RETURNING *`,
+         vat_rate=$7, price_with_vat=$8, weight=$9, volume=$10, unit=$11, specs=$12, photo_url=$13 WHERE id=$14 RETURNING *`,
       [sku || null, name, category || null, price || 0,
        dealerPrice || null, wholesalePrice || null, vatRate != null ? vatRate : null, priceWithVat,
-       weight || null, volume || null, specs || null, photoUrl || null, req.params.id]
+       weight || null, volume || null, unit || 'шт', specs || null, photoUrl || null, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Товар не найден' });
     const { rows: full } = await pool.query(

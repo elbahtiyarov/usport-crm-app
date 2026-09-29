@@ -88,7 +88,7 @@ function parseProducts(workbook) {
       if (weight) specParts.push(`Вес: ${weight} кг`);
       if (volume) specParts.push(`Объём: ${volume} м³`);
 
-      rows.push({ sku, name, category, price, weight, volume, specs: specParts.join(' · ') });
+      rows.push({ sku, name, category, price, weight, volume, unit: unit || 'шт', specs: specParts.join(' · ') });
     }
     if (rows.length) return rows; // нашли и разобрали лист — этого достаточно
   }
@@ -173,6 +173,7 @@ function parseDocuments(workbook) {
         const skuCol = findColumn(map, keys, k => k.includes('артикул') || k.includes('код'));
         const nameCol = findColumn(map, keys, k => k.includes('наименован'));
         const qtyCol = findColumn(map, keys, k => k.includes('кол-во') || k.includes('кол.во'));
+        const unitCol = findColumn(map, keys, k => k.includes('ед') && k.includes('изм'));
         const discountedPriceCol = findColumn(map, keys, k => k.includes('цена') && k.includes('скидк'));
         const plainPriceCol = findColumn(map, keys, k => k.includes('цена') && !k.includes('скидк'));
         const priceCol = discountedPriceCol || plainPriceCol;
@@ -193,7 +194,8 @@ function parseDocuments(workbook) {
           emptyStreak = 0;
           const price = priceCol ? (cellNumber(irow.getCell(priceCol)) || 0) : 0;
           const sku = skuCol ? cellText(irow.getCell(skuCol)).trim() : '';
-          const item = { sku, name, qty, price };
+          const unit = unitCol ? cellText(irow.getCell(unitCol)).trim() : '';
+          const item = { sku, name, qty, price, unit: unit || 'шт' };
           const img = rowImageMap[rr];
           if (img) { item.imageBuffer = img.buffer; item.imageExtension = img.extension; }
           items.push(item);
